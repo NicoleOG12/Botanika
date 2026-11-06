@@ -1,14 +1,11 @@
 plugins {
-    alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
-    alias(libs.plugins.kotlin.android)
+    id("com.android.application") version "9.3.3"
 }
 
 android {
     namespace = "com.example.botanika"
-    compileSdk {
-        version = release(37)
-    }
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.example.botanika"
@@ -22,9 +19,7 @@ android {
 
     buildTypes {
         release {
-            optimization {
-                enable = false
-            }
+            isMinifyEnabled = false
         }
     }
     compileOptions {
@@ -34,8 +29,13 @@ android {
     buildFeatures {
         compose = true
     }
-    kotlinOptions {
-        jvmTarget = "11"
+    // REMOVED: kotlinOptions block that caused the error
+}
+
+// ADDED: Modern compiler options block for AGP 9+ / built-in Kotlin
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_11)
     }
 }
 
