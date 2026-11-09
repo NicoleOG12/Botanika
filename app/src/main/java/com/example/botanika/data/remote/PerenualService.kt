@@ -1,7 +1,9 @@
-package com.example.botanika.data
+package com.example.botanika.data.remote
 
 import android.util.Log
+import com.google.gson.Gson
 import org.json.JSONObject
+import java.io.InputStreamReader
 
 class PerenualService {
     private val perenualApi: PerenualApi = PerenualApi()
@@ -17,9 +19,11 @@ class PerenualService {
 
         for (i in 0 until dataArray.length()) {
             val item = dataArray.getJSONObject(i)
+            Log.d("PERENUALLOG", "Item JSON: $item")
 
             val id = item.optInt("id", 0)
             val commonName = item.optString("common_name", "Nome desconhecido")
+            Log.d("PERENUALLOG", "Planta parseada - id: $id, nome: $commonName")
 
             val scientificArray = item.optJSONArray("scientific_name")
             val scientificName = if (scientificArray != null && scientificArray.length() > 0) {
@@ -63,6 +67,17 @@ class PerenualService {
 
         return plantasList
     }
+
+
+    fun detalhes(idPlanta: Int): PlantaDetalhes? {
+        Log.d("PERENUALLOG", "id: ${idPlanta}")
+        val gson = Gson()
+        val res = perenualApi.buscarDetalhesDaPlanta(idPlanta)
+        if (!res.isNullOrBlank()) return gson.fromJson(res, PlantaDetalhes::class.java)
+        return null
+    }
+
+
 }
 
 data class Planta(
@@ -78,3 +93,4 @@ data class Planta(
     val smallUrl: String?,
     val thumbnail: String?
 )
+

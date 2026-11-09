@@ -1,4 +1,4 @@
-package com.example.botanika.data
+package com.example.botanika.data.remote
 
 import android.util.Log
 import java.io.BufferedReader
@@ -12,7 +12,7 @@ import javax.net.ssl.HttpsURLConnection
 class PerenualApi {
 
     private val apiKey: String = "sk-pWHU6aedb825b1d5420554"
-    private val baseUrl: String = "https://perenual.com/api"
+    private val baseUrl: String = "https://perenual.com/api/v2"
 
 
     fun buscarPlantas(busca: String): String?{
@@ -30,16 +30,21 @@ class PerenualApi {
         return null
     }
 
-    public fun buscarDetalhesDaPlanta(id: Int){
+    public fun buscarDetalhesDaPlanta(id: Int): String?{
 
         Log.d("PERENUALLOG", "buscando detalhes da planta")
 
-        val uri = URI("${baseUrl}/species/detail/$id?key${apiKey}")
+        val uri = URI("${baseUrl}/species/details/$id?key=$apiKey")
+
+        Log.d("PERENUALLOG", uri.toString())
+
         val url = uri.toURL()
 
         val response: String? = fazerRequisicaoGET(url)
 
         if(!response.isNullOrBlank()) Log.d("PERENUALLOG", response)
+
+        return response
 
     }
 

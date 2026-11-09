@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "269766260999",
+    "project_id": "botanika-app",
+    "storage_bucket": "botanika-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:269766260999:android:e35c4c7970971b50cdada2",
+        "android_client_info": {
+          "package_name": "com.example.botanika"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCqxbgqh66OpxG0bg9HasLWFa_W2vpG7qY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
