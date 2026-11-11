@@ -14,10 +14,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.botanika.data.remote.PlantaDetalhes
 import com.example.botanika.ui.camera.CameraScreen
 import com.example.botanika.ui.components.MainTab
 import com.example.botanika.ui.components.PlantImage
 import com.example.botanika.ui.components.todayUtcMillis
+import com.example.botanika.ui.explore.CatalogPlant
 import com.example.botanika.ui.explore.ExploreScreen
 import com.example.botanika.ui.garden.GardenScreen
 import com.example.botanika.ui.home.HomeScreen
@@ -79,7 +81,9 @@ internal fun BotanikaApp(vm: BotanikaViewModel = viewModel()) {
                 Screen.Login -> LoginScreen(
                     flower = flower,
                     animatedVisibilityScope = this,
-                    onLogin = { _, _, _ -> vm.resetTo(Screen.Home) },
+                    onLogin = { email, senha, lembrar ->
+                        vm.login(email, senha, lembrar)
+                    },
                     onForgotPassword = {},
                     onSignUp = { vm.resetTo(Screen.Register) }
                 )
@@ -109,6 +113,7 @@ internal fun BotanikaApp(vm: BotanikaViewModel = viewModel()) {
                 }
 
                 Screen.Explore -> ExploreScreen(
+                    viewModel = vm,
                     onCameraSearch = { vm.push(Screen.Camera) },
                     onPlantClick = { vm.openCatalogDetail(it.id) },
                     onTabSelected = goToTab
@@ -164,35 +169,15 @@ internal fun BotanikaApp(vm: BotanikaViewModel = viewModel()) {
                 Screen.PlantDetail -> {
                     val mine = vm.garden.firstOrNull { it.id == vm.detailPlantId }
                     val catalog = PlantGuides.find(vm.detailCatalogId)
-                    if (mine != null) {
+                    val apiDetail = vm.selectedPlantDetail
+                    if (apiDetail != null) {
                         PlantDetailScreen(
-                            name = mine.name,
-                            image = mine.image,
-                            info = PlantGuides.find(mine.catalogId),
-                            myPlant = mine,
-                            reminders = vm.reminders.filter { it.plantId == mine.id },
-                            onBack = vm::back,
-                            onAddToGarden = {},
-                            onWater = { vm.waterPlant(mine.id) },
-                            onCreateReminder = { vm.openReminderForm(plantId = mine.id) },
-                            onEditReminder = { vm.openReminderForm(reminderId = it.id) },
-                            onRemove = {
-                                vm.removePlant(mine.id)
-                                vm.back()
-                            }
-                        )
-                    } else if (catalog != null) {
-                        val name = context.getString(catalog.name)
-                        PlantDetailScreen(
-                            name = name,
-                            image = PlantImage.Res(catalog.image),
-                            info = catalog,
+                            name = apiDetail.nomeComum ?: "Nome desconhecido",
+                            image = PlantImage.Url(apiDetail.imagemPadrao?.miniatura ?: ""),                             info = null, // Ou mapeie para o formato de info que sua tela aceita
                             myPlant = null,
                             reminders = emptyList(),
                             onBack = vm::back,
-                            onAddToGarden = {
-                                vm.openPlantForm(PlantDraft(catalog.id, name, PlantImage.Res(catalog.image)))
-                            },
+                            onAddToGarden = {},
                             onWater = {},
                             onCreateReminder = {},
                             onEditReminder = {},

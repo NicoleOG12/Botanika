@@ -34,12 +34,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.botanika.BotanikaViewModel
 import com.example.botanika.R
 import com.example.botanika.ui.animation.revealed
 import com.example.botanika.ui.components.BottomNavBar
@@ -68,44 +69,28 @@ enum class PlantFilter(val label: Int) {
 
 data class CatalogPlant(
     val id: String,
-    val name: Int,
-    val tags: Int,
-    val image: Int,
+    val name: String,
+    val tags: String,
+    val image: String?,
     val filters: Set<PlantFilter>
-)
-
-private val SamplePlants = listOf(
-    CatalogPlant(
-        "monstera", R.string.explore_plant_monstera, R.string.explore_tag_easy_air,
-        R.drawable.plant_monstera, setOf(PlantFilter.Indoor)
-    ),
-    CatalogPlant(
-        "kentia", R.string.explore_plant_kentia, R.string.explore_tag_easy_air,
-        R.drawable.plant_kentia, setOf(PlantFilter.Indoor)
-    ),
-    CatalogPlant(
-        "zamioculcas", R.string.explore_plant_zamioculcas, R.string.explore_tag_resistant_shade,
-        R.drawable.plant_zamioculcas, setOf(PlantFilter.Indoor)
-    ),
-    CatalogPlant(
-        "sansevieria", R.string.explore_plant_sansevieria, R.string.explore_tag_resistant_water,
-        R.drawable.plant_sansevieria, setOf(PlantFilter.Indoor, PlantFilter.Sun)
-    ),
-    CatalogPlant(
-        "aloe", R.string.explore_plant_aloe, R.string.explore_tag_medicinal_sun,
-        R.drawable.plant_aloe, setOf(PlantFilter.Sun)
-    )
 )
 
 @Composable
 internal fun ExploreScreen(
-    plants: List<CatalogPlant> = SamplePlants,
+    viewModel: BotanikaViewModel = viewModel(),
     onOpenSettings: () -> Unit = {},
     onCameraSearch: () -> Unit = {},
     onPlantClick: (CatalogPlant) -> Unit = {},
     onTabSelected: (MainTab) -> Unit = {}
 ) {
-    val context = LocalContext.current
+    val plants = viewModel.listaPlantas
+
+    LaunchedEffect(Unit) {
+        if (plants.isEmpty()) {
+            viewModel.carregarPlantas()
+        }
+    }
+
     var query by rememberSaveable { mutableStateOf("") }
     var filter by rememberSaveable { mutableStateOf(PlantFilter.All) }
 
@@ -113,7 +98,7 @@ internal fun ExploreScreen(
         val q = query.trim().normalizedForSearch()
         plants.filter { plant ->
             (filter == PlantFilter.All || filter in plant.filters) &&
-                (q.isEmpty() || context.getString(plant.name).normalizedForSearch().contains(q))
+                (q.isEmpty() || plant.name.normalizedForSearch().contains(q) || plant.tags.normalizedForSearch().contains(q))
         }
     }
 
@@ -180,9 +165,9 @@ internal fun ExploreScreen(
             visible.forEach { plant ->
                 val index = plants.indexOf(plant)
                 PlantPhotoCard(
-                    name = stringResource(plant.name),
-                    subtitle = stringResource(plant.tags),
-                    image = PlantImage.Res(plant.image),
+                    name = plant.name,
+                    subtitle = plant.tags,
+                    image = if (!plant.image.isNullOrBlank()) PlantImage.Url(plant.image) else PlantImage.None,
                     onClick = { onPlantClick(plant) },
                     modifier = Modifier.revealed(sections[3 + index])
                 )

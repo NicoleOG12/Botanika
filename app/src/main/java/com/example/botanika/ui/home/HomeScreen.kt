@@ -81,6 +81,7 @@ internal fun HomeScreen(
     onTabSelected: (MainTab) -> Unit = {}
 ) {
     val sections = remember(tasks.size) { List(3 + tasks.size) { Animatable(0f) } }
+
     LaunchedEffect(sections) {
         val spec = tween<Float>(CONTENT_FADE_MILLIS, easing = EaseInOutSine)
         sections.forEachIndexed { i, a ->

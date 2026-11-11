@@ -1,9 +1,9 @@
 package com.example.botanika.data.local
 
 import android.content.Context
-import androidx.room3.Database
-import androidx.room3.Room
-import androidx.room3.RoomDatabase
+import androidx.room.Database
+import androidx.room.Room
+import androidx.room.RoomDatabase
 
 
 @Database(entities = [LembreteEntity::class], version = 1, exportSchema = false)

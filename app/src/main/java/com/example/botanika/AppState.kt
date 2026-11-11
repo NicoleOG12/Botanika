@@ -1,19 +1,29 @@
 package com.example.botanika
 
 import android.net.Uri
+import android.util.Log
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.example.botanika.data.remote.PerenualService
+import com.example.botanika.data.remote.PlantaDetalhes
+import com.example.botanika.data.remote.UsuarioService
 import com.example.botanika.ui.components.PlantImage
 import com.example.botanika.ui.components.addDays
 import com.example.botanika.ui.components.todayUtcMillis
+import com.example.botanika.ui.explore.CatalogPlant
+import com.example.botanika.ui.explore.PlantFilter
 import com.example.botanika.ui.home.CareType
 import com.example.botanika.ui.plants.MyPlant
 import com.example.botanika.ui.plants.PlantDraft
 import com.example.botanika.ui.plants.PlantLocation
 import com.example.botanika.ui.plants.Reminder
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 internal enum class Screen {
     Splash, Welcome, Login, Register,
@@ -23,10 +33,53 @@ internal enum class Screen {
 
 internal class BotanikaViewModel : ViewModel() {
 
+
+    val usuarioService: UsuarioService = UsuarioService()
+    val perenualService: PerenualService = PerenualService()
     val stack = mutableStateListOf(Screen.Splash)
     val screen: Screen get() = stack.last()
+    val TAG = "BotanikaViewModelLog"
     val canGoBack: Boolean get() = stack.size > 1
 
+    fun login(email: String, senha: String, lembrar: Boolean) {
+        viewModelScope.launch {
+            try {
+                val success = usuarioService.fazerLogin(email, senha)
+                if (success) {
+                    push(Screen.Home)
+                }
+            } catch (e: Exception) {
+                Log.d(TAG, "Erro ao logar: $e")
+
+            }
+        }
+    }
+
+    // Estado que a UI vai observar
+    var listaPlantas by mutableStateOf<List<CatalogPlant>>(emptyList())
+        private set
+
+    fun carregarPlantas() {
+      viewModelScope.launch {
+            try {
+                val res = withContext(Dispatchers.IO) {
+                    perenualService.plantas("")
+                }
+                listaPlantas = res.map { planta ->
+                    CatalogPlant(
+                        id = planta.id.toString(),
+                        name = planta.nomeComum,
+                        tags = planta.nomeCientifico,
+                        image = planta.smallUrl,
+                        filters = setOf(PlantFilter.All)
+                    )
+                }
+
+            } catch (e: Exception) {
+                Log.d(TAG, "Erro ao buscar plantas: $e")
+            }
+        }
+    }
     fun push(next: Screen) {
         stack.add(next)
     }
@@ -58,10 +111,38 @@ internal class BotanikaViewModel : ViewModel() {
     var reminderPlantId by mutableStateOf<String?>(null)
         private set
 
+
+    var selectedPlantDetail by mutableStateOf<PlantaDetalhes?>(null) // Substitua pelo seu modelo de dados de detalhes
+        private set
+
+    var isLoadingDetail by mutableStateOf(false)
+        private set
+
     fun openCatalogDetail(catalogId: String) {
         detailCatalogId = catalogId
         detailPlantId = null
-        push(Screen.PlantDetail)
+
+        viewModelScope.launch {
+            isLoadingDetail = true
+            try {
+                val plantIdInt = catalogId.toIntOrNull()
+
+                if (plantIdInt != null) {
+                    val plantaDetalhes: PlantaDetalhes? = withContext(Dispatchers.IO) {
+                        perenualService.detalhes(plantIdInt)
+                    }
+                    if(plantaDetalhes != null) {
+                        selectedPlantDetail = plantaDetalhes
+                    }
+                }
+                push(Screen.PlantDetail)
+
+            } catch (e: Exception) {
+                Log.d(TAG, "Erro ao buscar detalhes da planta: $e")
+            } finally {
+                isLoadingDetail = false
+            }
+        }
     }
 
     fun openMyPlantDetail(plantId: String) {
@@ -121,6 +202,8 @@ internal class BotanikaViewModel : ViewModel() {
     fun deleteReminder(reminderId: String) {
         reminders.removeAll { it.id == reminderId }
     }
+
+
 
     fun toggleNotify(reminderId: String) {
         val index = reminders.indexOfFirst { it.id == reminderId }
