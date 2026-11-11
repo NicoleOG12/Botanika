@@ -14,12 +14,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.botanika.data.remote.PlantaDetalhes
 import com.example.botanika.ui.camera.CameraScreen
 import com.example.botanika.ui.components.MainTab
 import com.example.botanika.ui.components.PlantImage
 import com.example.botanika.ui.components.todayUtcMillis
-import com.example.botanika.ui.explore.CatalogPlant
 import com.example.botanika.ui.explore.ExploreScreen
 import com.example.botanika.ui.garden.GardenScreen
 import com.example.botanika.ui.home.HomeScreen
@@ -34,6 +32,7 @@ import com.example.botanika.ui.plants.PlantGuides
 import com.example.botanika.ui.plants.ReminderFormScreen
 import com.example.botanika.ui.plants.nextOccurrence
 import com.example.botanika.ui.plants.toCareTask
+import com.example.botanika.ui.plants.toPlantInfo
 import com.example.botanika.ui.register.RegisterScreen
 import com.example.botanika.ui.routine.RoutineScreen
 import com.example.botanika.ui.splash.SplashScreen
@@ -159,7 +158,7 @@ internal fun BotanikaApp(vm: BotanikaViewModel = viewModel()) {
                             onViewInfo = { vm.openCatalogDetail(it.id) },
                             onAddToGarden = { info ->
                                 vm.openPlantForm(
-                                    PlantDraft(info.id, context.getString(info.name), PlantImage.Photo(photo))
+                                    PlantDraft(info.id, info.name, PlantImage.Photo(photo))
                                 )
                             }
                         )
@@ -170,20 +169,52 @@ internal fun BotanikaApp(vm: BotanikaViewModel = viewModel()) {
                     val mine = vm.garden.firstOrNull { it.id == vm.detailPlantId }
                     val catalog = PlantGuides.find(vm.detailCatalogId)
                     val apiDetail = vm.selectedPlantDetail
-                    if (apiDetail != null) {
-                        PlantDetailScreen(
-                            name = apiDetail.nomeComum ?: "Nome desconhecido",
-                            image = PlantImage.Url(apiDetail.imagemPadrao?.miniatura ?: ""),                             info = null, // Ou mapeie para o formato de info que sua tela aceita
-                            myPlant = null,
-                            reminders = emptyList(),
-                            onBack = vm::back,
-                            onAddToGarden = {},
-                            onWater = {},
-                            onCreateReminder = {},
-                            onEditReminder = {},
-                            onRemove = {}
-                        )
-                    }
+                    val catalogInfo = if (mine?.catalogId != null) PlantGuides.find(mine.catalogId) else catalog
+                    val plantInfo = apiDetail?.toPlantInfo() ?: catalogInfo
+
+                    val plantName = mine?.name ?: apiDetail?.nomeComum ?: catalogInfo?.name ?: "Nome desconhecido"
+                    val plantImage = mine?.image ?: apiDetail?.let {
+                        PlantImage.Url(it.imagemPadrao?.urlRegular ?: it.imagemPadrao?.miniatura ?: "")
+                    } ?: catalogInfo?.image?.let { PlantImage.Url(it) } ?: PlantImage.None
+
+                    PlantDetailScreen(
+                        name = plantName,
+                        image = plantImage,
+                        info = plantInfo,
+                        myPlant = mine,
+                        reminders = if (mine != null) vm.reminders.filter { it.plantId == mine.id } else emptyList(),
+                        onBack = vm::back,
+                        onAddToGarden = {
+                            if (apiDetail != null) {
+                                vm.openPlantForm(
+                                    PlantDraft(
+                                        catalogId = apiDetail.id.toString(),
+                                        name = apiDetail.nomeComum,
+                                        image = PlantImage.Url(apiDetail.imagemPadrao?.urlRegular ?: apiDetail.imagemPadrao?.miniatura ?: "")
+                                    )
+                                )
+                            }
+                        },
+                        onWater = {
+                            if (mine != null) {
+                                vm.waterPlant(mine.id)
+                            }
+                        },
+                        onCreateReminder = {
+                            if (mine != null) {
+                                vm.openReminderForm(plantId = mine.id)
+                            }
+                        },
+                        onEditReminder = { reminder ->
+                            vm.openReminderForm(reminderId = reminder.id)
+                        },
+                        onRemove = {
+                            if (mine != null) {
+                                vm.removePlant(mine.id)
+                                vm.back()
+                            }
+                        }
+                    )
                 }
 
                 Screen.PlantForm -> PlantFormScreen(

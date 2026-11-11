@@ -67,7 +67,7 @@ internal fun PlantFormScreen(
     onSave: (MyPlant) -> Unit
 ) {
     val info = PlantGuides.find(initial.catalogId)
-    var name by rememberSaveable { mutableStateOf(initial.name) }
+    var name by rememberSaveable { mutableStateOf(initial.name ?: "") }
     var photo by rememberSaveable { mutableStateOf((initial.image as? PlantImage.Photo)?.uri?.toString()) }
     var location by rememberSaveable { mutableStateOf(PlantLocation.Living) }
     var everyDays by rememberSaveable { mutableIntStateOf(info?.wateringEveryDays ?: 7) }

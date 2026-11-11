@@ -31,7 +31,7 @@ import kotlin.math.max
 sealed interface PlantImage {
     data class Res(val id: Int) : PlantImage
     data class Photo(val uri: Uri) : PlantImage
-    data class Url(val url: String) : PlantImage
+    data class Url(val url: String?) : PlantImage
     data object None : PlantImage
 }
 
@@ -116,7 +116,7 @@ private fun decodePhoto(context: Context, uri: Uri): ImageBitmap? = runCatching 
     result.asImageBitmap()
 }.getOrNull()
 
-private fun decodeUrl(urlString: String): ImageBitmap? = runCatching {
+private fun decodeUrl(urlString: String?): ImageBitmap? = runCatching {
     val url = java.net.URL(urlString)
     url.openStream().use { inputStream ->
         BitmapFactory.decodeStream(inputStream)?.asImageBitmap()

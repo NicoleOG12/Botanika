@@ -169,7 +169,7 @@ private fun MatchCard(match: PlantMatch, best: Boolean, selected: Boolean, onCli
         verticalAlignment = Alignment.CenterVertically
     ) {
         PlantImageView(
-            image = PlantImage.Res(match.plant.image),
+            image = PlantImage.Url(match.plant.image),
             modifier = Modifier
                 .size(64.dp)
                 .clip(RoundedCornerShape(16.dp))
@@ -184,12 +184,14 @@ private fun MatchCard(match: PlantMatch, best: Boolean, selected: Boolean, onCli
                     fontWeight = FontWeight.Bold
                 )
             }
-            Text(
-                text = stringResource(match.plant.name),
-                color = BotanikaGreen,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold
-            )
+            match.plant.name?.let {
+                Text(
+                    text = it,
+                    color = BotanikaGreen,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
             Text(
                 text = match.plant.scientific,
                 color = BotanikaMuted,

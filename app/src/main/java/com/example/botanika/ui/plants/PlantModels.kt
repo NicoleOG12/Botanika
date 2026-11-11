@@ -33,7 +33,7 @@ data class MyPlant(
 
 data class PlantDraft(
     val catalogId: String?,
-    val name: String,
+    val name: String?,
     val image: PlantImage
 )
 

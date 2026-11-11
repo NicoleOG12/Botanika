@@ -148,16 +148,18 @@ internal fun PlantDetailScreen(
 
                         Spacer(Modifier.height(24.dp))
                         SectionTitle(stringResource(R.string.detail_about))
-                        Text(
-                            text = info.description,
-                            color = BotanikaMuted,
-                            fontSize = 16.sp,
-                            lineHeight = 24.sp
-                        )
+                        info.description?.let {
+                            Text(
+                                text = it,
+                                color = BotanikaMuted,
+                                fontSize = 16.sp,
+                                lineHeight = 24.sp
+                            )
+                        }
 
                         Spacer(Modifier.height(24.dp))
                         SectionTitle(stringResource(R.string.detail_tips))
-                        info.tips.forEach { tip -> TipRow(tip) }
+                        info.tips?.forEach { tip -> TipRow(tip) }
                     } else {
                         Spacer(Modifier.height(20.dp))
                         Text(
@@ -365,12 +367,13 @@ private fun InfoGrid(info: PlantInfo) {
                 Modifier.weight(1f)
             )
         }
+        val isPetSafe = info.petSafe == true
         InfoTile(
-            icon = if (info.petSafe) DoodleIconType.Check else DoodleIconType.Close,
+            icon = if (isPetSafe) DoodleIconType.Check else DoodleIconType.Close,
             title = stringResource(R.string.detail_pets),
-            value = stringResource(if (info.petSafe) R.string.detail_pets_safe else R.string.detail_pets_toxic),
+            value = stringResource(if (isPetSafe) R.string.detail_pets_safe else R.string.detail_pets_toxic),
             modifier = Modifier.fillMaxWidth(),
-            iconColor = if (info.petSafe) BotanikaGreen else BotanikaError
+            iconColor = if (isPetSafe) BotanikaGreen else BotanikaError
         )
     }
 }
@@ -379,7 +382,7 @@ private fun InfoGrid(info: PlantInfo) {
 private fun InfoTile(
     icon: DoodleIconType,
     title: String,
-    value: String,
+    value: String?,
     modifier: Modifier = Modifier,
     iconColor: Color = BotanikaGreen
 ) {
@@ -405,7 +408,7 @@ private fun InfoTile(
         Column(Modifier.weight(1f)) {
             Text(text = title, color = BotanikaMuted, fontSize = 12.sp)
             Text(
-                text = value,
+                text = value ?: "",
                 color = BotanikaGreen,
                 fontSize = 14.sp,
                 lineHeight = 18.sp,

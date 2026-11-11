@@ -3,7 +3,6 @@ package com.example.botanika.data.remote
 import android.util.Log
 import com.google.gson.Gson
 import org.json.JSONObject
-import java.io.InputStreamReader
 
 class PerenualService {
     private val perenualApi: PerenualApi = PerenualApi()
@@ -71,10 +70,9 @@ class PerenualService {
 
     fun detalhes(idPlanta: Int): PlantaDetalhes? {
         Log.d("PERENUALLOG", "id: ${idPlanta}")
-        val gson = Gson()
         val res = perenualApi.buscarDetalhesDaPlanta(idPlanta)
-        if (!res.isNullOrBlank()) return gson.fromJson(res, PlantaDetalhes::class.java)
-        return null
+        if (res.isNullOrBlank()) return null
+        return Gson().fromJson(res, PlantaDetalhes::class.java)
     }
 
 
