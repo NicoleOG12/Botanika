@@ -112,10 +112,10 @@ fun Planta.toMyPlant(): MyPlant = MyPlant(
     catalogId = id.toString(),
     name = nomeComum,
     image = PlantImage.Url(regularUrl ?: mediumUrl ?: originalUrl ?: smallUrl ?: thumbnail ?: ""),
-    location = PlantLocation.Living,
-    wateringEveryDays = 7,
-    lastWateredUtc = todayUtcMillis(),
-    notes = ""
+    location = PlantLocation.entries.firstOrNull { it.name == localizacao } ?: PlantLocation.Living,
+    wateringEveryDays = diasRega ?: 7,
+    lastWateredUtc = ultimaRegaUtc ?: todayUtcMillis(),
+    notes = notas ?: ""
 )
 
 data class PlantMatch(val plant: PlantInfo, val confidence: Int)

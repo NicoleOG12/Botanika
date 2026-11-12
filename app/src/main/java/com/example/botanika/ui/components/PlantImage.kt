@@ -16,6 +16,7 @@ import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -92,6 +93,20 @@ fun PlantImageView(
     }
 }
 
+/** Reduz a foto e a converte em data URI (JPEG/base64) para ser gravada no Firestore. */
+fun photoToDataUri(context: Context, uri: Uri, maxSide: Int = 640): String? = runCatching {
+    val bitmap = decodePhoto(context, uri)?.asAndroidBitmap() ?: return@runCatching null
+    val scale = maxSide.toFloat() / max(bitmap.width, bitmap.height)
+    val finalBitmap = if (scale < 1f) {
+        Bitmap.createScaledBitmap(bitmap, (bitmap.width * scale).toInt(), (bitmap.height * scale).toInt(), true)
+    } else {
+        bitmap
+    }
+    val out = java.io.ByteArrayOutputStream()
+    finalBitmap.compress(Bitmap.CompressFormat.JPEG, 80, out)
+    "data:image/jpeg;base64," + android.util.Base64.encodeToString(out.toByteArray(), android.util.Base64.NO_WRAP)
+}.getOrNull()
+
 private fun decodePhoto(context: Context, uri: Uri): ImageBitmap? = runCatching {
     val resolver = context.contentResolver
     val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
@@ -117,6 +132,10 @@ private fun decodePhoto(context: Context, uri: Uri): ImageBitmap? = runCatching 
 }.getOrNull()
 
 private fun decodeUrl(urlString: String?): ImageBitmap? = runCatching {
+    if (urlString != null && urlString.startsWith("data:image")) {
+        val bytes = android.util.Base64.decode(urlString.substringAfter("base64,"), android.util.Base64.DEFAULT)
+        return@runCatching BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
+    }
     val url = java.net.URL(urlString)
     url.openStream().use { inputStream ->
         BitmapFactory.decodeStream(inputStream)?.asImageBitmap()

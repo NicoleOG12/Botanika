@@ -35,5 +35,9 @@ data class Planta(
     val smallUrl: String?,
     val thumbnail: String?,
     val isIndoor: Boolean = false,
-    val isSun: Boolean = false
+    val isSun: Boolean = false,
+    val localizacao: String? = null,
+    val diasRega: Int? = null,
+    val ultimaRegaUtc: Long? = null,
+    val notas: String? = null
 )

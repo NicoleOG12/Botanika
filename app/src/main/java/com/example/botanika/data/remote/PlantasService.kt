@@ -139,7 +139,7 @@ class PlantasService {
                 lista.add(
                     Planta(
                         id = id,
-                        nomeComum = deepLApi.traduzirParaPortugues(commonName),
+                        nomeComum = commonName,
                         nomeCientifico = scientificName,
                         license = license,
                         licenseName = licenseName,
@@ -155,11 +155,17 @@ class PlantasService {
                 )
             }
 
+            // Traduz todos os nomes em UMA única requisição (antes eram até 30 requisições sequenciais)
+            val nomesTraduzidos = deepLApi.traduzirListaParaPortugues(lista.map { it.nomeComum })
+            val listaTraduzida = lista.mapIndexed { i, p ->
+                p.copy(nomeComum = nomesTraduzidos.getOrNull(i)?.ifBlank { null } ?: p.nomeComum)
+            }
+
             val resultado = if (termo.isBlank()) {
-                lista
+                listaTraduzida
             } else {
                 val termoTraduzido = deepLApi.traduzirParaIngles(termo)
-                lista.filter { planta ->
+                listaTraduzida.filter { planta ->
                     planta.nomeComum.lowercase().contains(termoTraduzido) ||
                     planta.nomeCientifico.lowercase().contains(termoTraduzido)
                 }
@@ -480,13 +486,17 @@ class PlantasService {
         try{
             val dados = mutableMapOf<String, Any>(
                 "idPlanta" to planta.id,
-                "nomePlanta" to deepLApi.traduzirParaPortugues(planta.nomeComum),
+                "nomePlanta" to planta.nomeComum,
                 "nomeCientifico" to planta.nomeCientifico,
                 "idUsuario" to idUsuario
             )
 
             val foto = planta.regularUrl ?: planta.mediumUrl ?: planta.originalUrl ?: planta.smallUrl ?: planta.thumbnail
             if (!foto.isNullOrBlank()) dados["thumbnail"] = foto
+            planta.localizacao?.let { dados["localizacao"] = it }
+            planta.diasRega?.let { dados["diasRega"] = it }
+            planta.ultimaRegaUtc?.let { dados["ultimaRegaUtc"] = it }
+            if (!planta.notas.isNullOrBlank()) dados["notas"] = planta.notas
 
             if(temNoJardim(dados)){
                 Log.d(TAG, "Planta ${planta.id} já existe no jardim do usuário $idUsuario")
@@ -563,7 +573,11 @@ class PlantasService {
                         regularUrl = null,
                         mediumUrl = null,
                         smallUrl = thumbnail,
-                        thumbnail = thumbnail
+                        thumbnail = thumbnail,
+                        localizacao = doc.getString("localizacao"),
+                        diasRega = doc.getLong("diasRega")?.toInt(),
+                        ultimaRegaUtc = doc.getLong("ultimaRegaUtc"),
+                        notas = doc.getString("notas")
                     )
                 )
             }

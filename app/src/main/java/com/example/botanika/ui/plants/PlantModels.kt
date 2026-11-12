@@ -39,7 +39,8 @@ data class MyPlant(
 data class PlantDraft(
     val catalogId: String?,
     val name: String?,
-    val image: PlantImage
+    val image: PlantImage,
+    val scientific: String? = null
 )
 
 enum class RepeatOption(val days: Int, val label: Int) {

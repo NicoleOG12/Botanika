@@ -9,6 +9,7 @@ import java.net.URI
 import java.net.URL
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
+import java.util.concurrent.ConcurrentHashMap
 import javax.net.ssl.HttpsURLConnection
 
 class DeepLApi {
@@ -18,29 +19,44 @@ class DeepLApi {
     private val baseUrl = "https://api-free.deepl.com/v2/translate"
     private val apiKey = "2f83e93f-46c2-4766-9c44-192b9f2214ab:fx"
 
+    private companion object {
+        // Cache compartilhado entre todas as instâncias: evita repetir requisições para o mesmo texto
+        val cache = ConcurrentHashMap<String, String>()
+    }
+
     fun traduzirParaIngles(texto: String): String {
         if (texto.isBlank()) return texto
+        val chave = "EN|$texto"
+        cache[chave]?.let { return it }
         Log.d(TAG, "Traduzindo para inglês: $texto")
         val res = requisicaoDeepL(texto, idiomaDestino = "EN")
+        if (res.isNotBlank()) cache[chave] = res
         return if (res.isNotBlank()) res else texto
     }
 
     fun traduzirParaPortugues(texto: String): String {
         if (texto.isBlank()) return texto
+        val chave = "PT|$texto"
+        cache[chave]?.let { return it }
         Log.d(TAG, "Traduzindo para português: $texto")
         val res = requisicaoDeepL(texto, idiomaDestino = "PT")
+        if (res.isNotBlank()) cache[chave] = res
         return if (res.isNotBlank()) res else texto
     }
 
     fun traduzirListaParaPortugues(textos: List<String>): List<String> {
         if (textos.isEmpty()) return emptyList()
 
-        val indicesENaoVazios = textos.mapIndexedNotNull { index, s ->
-            if (s.isNotBlank()) index to s else null
-        }
-        if (indicesENaoVazios.isEmpty()) return textos
-
         val resultado = textos.toMutableList()
+
+        // Só envia ao DeepL o que ainda não está em cache
+        val indicesENaoVazios = mutableListOf<Pair<Int, String>>()
+        textos.forEachIndexed { index, s ->
+            if (s.isBlank()) return@forEachIndexed
+            val emCache = cache["PT|$s"]
+            if (emCache != null) resultado[index] = emCache else indicesENaoVazios.add(index to s)
+        }
+        if (indicesENaoVazios.isEmpty()) return resultado
 
         for (chunk in indicesENaoVazios.chunked(50)) {
             val listaTextos = chunk.map { it.second }
@@ -49,6 +65,7 @@ class DeepLApi {
             if (traducaoChunk.size == chunk.size) {
                 chunk.forEachIndexed { i, (originalIdx, originalTexto) ->
                     val trad = traducaoChunk[i]
+                    if (trad.isNotBlank()) cache["PT|$originalTexto"] = trad
                     resultado[originalIdx] = if (trad.isNotBlank()) trad else originalTexto
                 }
             } else {

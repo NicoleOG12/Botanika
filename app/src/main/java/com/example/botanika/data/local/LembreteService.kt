@@ -4,8 +4,9 @@ import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.util.Log
-import com.example.botanika.data.remote.DeepLApi
+import com.example.botanika.MainActivity
 import com.example.botanika.ui.components.addDays
 import com.example.botanika.ui.components.utcDay
 import com.example.botanika.ui.components.utcMonth
@@ -16,8 +17,6 @@ import java.util.Calendar
 
 class LembreteService {
     private val TAG = "LEMBRETE_SERVICE_LOG"
-
-    private val deepLApi = DeepLApi()
 
     suspend fun salvarEAgendar(context: Context, reminder: Reminder): String {
         Log.d(TAG, "salvarEAgendar - INICIO. Planta: ${reminder.plantName}, Tipo: ${reminder.type}, ID: ${reminder.id}")
@@ -33,7 +32,7 @@ class LembreteService {
             val entity = LembreteEntity(
                 id = reminderId,
                 plantId = reminder.plantId,
-                plantName = deepLApi.traduzirParaPortugues(reminder.plantName),
+                plantName = reminder.plantName,
                 type = reminder.type.name,
                 dateUtc = reminder.dateUtc,
                 hour = reminder.hour,
@@ -42,7 +41,7 @@ class LembreteService {
                 note = reminder.note,
                 notify = true,
                 plantaId = reminder.plantId.toIntOrNull() ?: 0,
-                nomePlanta = deepLApi.traduzirParaPortugues(reminder.plantName),
+                nomePlanta = reminder.plantName,
                 mensagem = mensagem,
                 tempoEmMillis = triggerTime
             )
@@ -51,7 +50,7 @@ class LembreteService {
             Log.d(TAG, "salvarEAgendar - Lembrete salvo no Room com sucesso! ID: $reminderId")
 
             if (triggerTime > System.currentTimeMillis()) {
-                agendarAlarme(context, reminderId.hashCode(), reminder, triggerTime, mensagem)
+                agendarAlarme(context, reminderId.hashCode(), triggerTime, mensagem)
             } else {
                 Log.d(TAG, "salvarEAgendar - Lembrete no passado, alarme não agendado.")
             }
@@ -81,35 +80,64 @@ class LembreteService {
         return triggerTime
     }
 
-    private fun agendarAlarme(context: Context, alarmId: Int, reminder: Reminder, triggerTime: Long, mensagem: String) {
+    private fun criarPendingIntent(context: Context, alarmId: Int, mensagem: String): PendingIntent {
+        val intent = Intent(context, LembreteReciever::class.java).apply {
+            putExtra("MENSAGEM", mensagem)
+            putExtra("ID_LEMBRETE", alarmId)
+        }
+        return PendingIntent.getBroadcast(
+            context,
+            alarmId,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+    }
+
+    private fun agendarAlarme(context: Context, alarmId: Int, triggerTime: Long, mensagem: String) {
         try {
             val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+            val pendingIntent = criarPendingIntent(context, alarmId, mensagem)
 
-            val intent = Intent(context, LembreteReciever::class.java).apply {
-                putExtra("MENSAGEM", mensagem)
-                putExtra("ID_LEMBRETE", alarmId)
+            val podeExato = Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarmManager.canScheduleExactAlarms()
+            if (podeExato) {
+                try {
+                    alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerTime, pendingIntent)
+                    Log.d(TAG, "agendarAlarme - Alarme exato agendado em $triggerTime")
+                    return
+                } catch (e: SecurityException) {
+                    Log.w(TAG, "agendarAlarme - SecurityException no alarme exato: ${e.localizedMessage}")
+                }
             }
-
-            val pendingIntent = PendingIntent.getBroadcast(
+            // Sem permissão de alarme exato: setAlarmClock não precisa de permissão e dispara na hora, mesmo em Doze
+            val showIntent = PendingIntent.getActivity(
                 context,
-                alarmId,
-                intent,
+                0,
+                Intent(context, MainActivity::class.java),
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
-
-            try {
-                alarmManager.setExactAndAllowWhileIdle(
-                    AlarmManager.RTC_WAKEUP,
-                    triggerTime,
-                    pendingIntent
-                )
-                Log.d(TAG, "agendarAlarme - SUCESSO: Alarme exato agendado para ${reminder.plantName} em $triggerTime")
-            } catch (e: SecurityException) {
-                alarmManager.set(AlarmManager.RTC_WAKEUP, triggerTime, pendingIntent)
-                Log.w(TAG, "agendarAlarme - SecurityException ao agendar alarme exato: ${e.localizedMessage}")
-            }
+            alarmManager.setAlarmClock(AlarmManager.AlarmClockInfo(triggerTime, showIntent), pendingIntent)
+            Log.d(TAG, "agendarAlarme - Alarme agendado via setAlarmClock em $triggerTime")
         } catch (e: Exception) {
             Log.e(TAG, "EXCEÇÃO em agendarAlarme: ${e.javaClass.simpleName} - ${e.message}", e)
+        }
+    }
+
+    private fun cancelarAlarme(context: Context, alarmId: Int) {
+        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        alarmManager.cancel(criarPendingIntent(context, alarmId, ""))
+    }
+
+    /**
+     * Reagenda o próximo disparo de todos os lembretes salvos. Usado após reiniciar o celular,
+     * atualizar o app e a cada notificação disparada (para lembretes recorrentes).
+     */
+    suspend fun reagendarTodos(context: Context) {
+        val agora = System.currentTimeMillis()
+        for (r in carregarLembretesDoCelular(context)) {
+            val trigger = calcularTriggerTime(r)
+            if (trigger > agora) {
+                agendarAlarme(context, r.id.hashCode(), trigger, "Hora de cuidar de ${r.plantName} (${r.type})")
+            }
         }
     }
 
@@ -135,5 +163,6 @@ class LembreteService {
     suspend fun excluirLembreteDoCelular(context: Context, id: String) {
         val dao = AppDatabase.getDatabase(context).lemebreteDAO()
         dao.deletarLembretePorId(id)
+        cancelarAlarme(context, id.hashCode())
     }
 }

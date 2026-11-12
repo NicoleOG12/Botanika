@@ -82,6 +82,7 @@
     <string name="reset_password_sent">Enviamos o link para o seu e-mail.</string>
     <string name="reset_password_error">Não foi possível enviar o link. Verifique o e-mail.</string>
     <string name="notice_watered">Planta regada!</string>
+    <string name="notice_plant_save_error">Não foi possível salvar a planta. Ela pode já estar no seu jardim.</string>
     <string name="home_thirsty_title">Hora de regar!</string>
     <plurals name="home_thirsty_message">
         <item quantity="one">%d planta está esperando por água.</item>

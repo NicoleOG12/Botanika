@@ -248,7 +248,12 @@ internal fun BotanikaApp(vm: BotanikaViewModel = viewModel()) {
                                 onViewInfo = { vm.openCatalogDetail(it.id) },
                                 onAddToGarden = { info ->
                                     vm.openPlantForm(
-                                        PlantDraft(info.id.ifBlank { null }, info.name ?: info.scientific, PlantImage.Photo(photo))
+                                        PlantDraft(
+                                            info.id.ifBlank { null },
+                                            info.name ?: info.scientific,
+                                            PlantImage.Photo(photo),
+                                            info.scientific
+                                        )
                                     )
                                 }
                             )
@@ -307,10 +312,7 @@ internal fun BotanikaApp(vm: BotanikaViewModel = viewModel()) {
                     Screen.PlantForm -> PlantFormScreen(
                         initial = vm.draft,
                         onBack = vm::back,
-                        onSave = { plant ->
-                            vm.addPlant(plant)
-                            vm.resetTo(Screen.Garden)
-                        }
+                        onSave = vm::savePlantFromForm
                     )
 
                     Screen.ReminderForm -> ReminderFormScreen(

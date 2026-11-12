@@ -8,6 +8,9 @@ import android.content.Intent
 import android.os.Build
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 class LembreteReciever: BroadcastReceiver() {
     private val TAG = "LEMBRETE_RECEIVER_LOG"
@@ -16,6 +19,12 @@ class LembreteReciever: BroadcastReceiver() {
         Log.d(TAG, "onReceive - Alarme recebido pelo BroadcastReceiver!")
         if(context == null || intent == null){
             Log.w(TAG, "onReceive - Context ou Intent é nulo.")
+            return
+        }
+
+        // Após reiniciar o celular ou atualizar o app, os alarmes são perdidos: reagenda todos
+        if (intent.action == Intent.ACTION_BOOT_COMPLETED || intent.action == Intent.ACTION_MY_PACKAGE_REPLACED) {
+            reagendarEmSegundoPlano(context)
             return
         }
 
@@ -48,5 +57,22 @@ class LembreteReciever: BroadcastReceiver() {
 
         notificationManager.notify(idLembrete, notificacao)
         Log.d(TAG, "onReceive - Notificação exibida com ID: $idLembrete")
+
+        // Agenda a próxima ocorrência dos lembretes recorrentes
+        reagendarEmSegundoPlano(context)
+    }
+
+    private fun reagendarEmSegundoPlano(context: Context) {
+        val pendingResult = goAsync()
+        val appContext = context.applicationContext
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                LembreteService().reagendarTodos(appContext)
+            } catch (e: Exception) {
+                Log.e(TAG, "Erro ao reagendar lembretes: ${e.message}", e)
+            } finally {
+                pendingResult.finish()
+            }
+        }
     }
 }
