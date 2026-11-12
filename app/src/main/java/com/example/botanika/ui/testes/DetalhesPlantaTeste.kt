@@ -21,11 +21,11 @@ fun DetalhesPlantaTeste(
     modifier: Modifier = Modifier
 ) {
 
-    val perenualService = PerenualService()
+    val perenualService = remember { PerenualService() }
 
     var detalhes by remember { mutableStateOf<PlantaDetalhes?>(null) }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(idPlanta) {
         detalhes = withContext(Dispatchers.IO) {
             perenualService.detalhes(idPlanta)
         }
@@ -57,8 +57,8 @@ fun DetalhesPlantaTeste(
             val todosOsAtributos = listOf(
                 "ID" to d.id.toString(),
                 "Nome Comum" to (d.nomeComum ?: "N/A"),
-                "Nome Científico" to d.nomeCientifico.joinToString(", "),
-                "Outros Nomes" to d.outrosNomes.joinToString(", "),
+                "Nome Científico" to (d.nomeCientifico?.joinToString(", ") ?: "N/A"),
+                "Outros Nomes" to (d.outrosNomes?.joinToString(", ") ?: "N/A"),
                 "Família" to (d.familia ?: "N/A"),
                 "Híbrido" to (d.hibrido ?: "N/A"),
                 "Autoridade" to (d.autoridade ?: "N/A"),
@@ -67,30 +67,30 @@ fun DetalhesPlantaTeste(
                 "Variedade" to (d.variedade ?: "N/A"),
                 "Epíteto da Espécie" to (d.epitetosEspecie ?: "N/A"),
                 "Gênero" to (d.genero ?: "N/A"),
-                "Origem" to d.origem.joinToString(", "),
+                "Origem" to (d.origem?.joinToString(", ") ?: "N/A"),
                 "Tipo" to (d.tipo ?: "N/A"),
-                "Dimensões" to d.dimensoes.joinToString("; ") { "${it.tipo}: ${it.valorMin}-${it.valorMax}" },
+                "Dimensões" to (d.dimensoes?.joinToString("; ") { "${it.tipo}: ${it.valorMin}-${it.valorMax}" } ?: "N/A"),
                 "Ciclo" to (d.ciclo ?: "N/A"),
-                "Atrai" to d.atrai.joinToString(", "),
-                "Propagação" to d.propagacao.joinToString(", "),
+                "Atrai" to (d.atrai?.joinToString(", ") ?: "N/A"),
+                "Propagação" to (d.propagacao?.joinToString(", ") ?: "N/A"),
                 "Resistência ao Frio (Min/Max)" to "Min: ${d.resistenciaFrio?.min ?: "N/A"} | Max: ${d.resistenciaFrio?.max ?: "N/A"}",
                 "URL do Mapa de Resistência" to (d.localResistencia?.urlCompleta ?: "N/A"),
                 "Rega" to (d.rega ?: "N/A"),
                 "Benchmark de Rega" to "${d.benchmarkRega?.valor ?: "N/A"} ${d.benchmarkRega?.unidade ?: ""}",
-                "Anatomia da Planta" to d.anatomiaPlanta.joinToString(", ") { item ->
+                "Anatomia da Planta" to (d.anatomiaPlanta?.joinToString(", ") { item ->
                     if (item is Map<*, *>) {
                         item.entries.joinToString(", ") { "${it.key}: ${it.value}" }
                     } else {
                         item.toString()
                     }
-                },
-                "Luz Solar" to d.luzSolar.joinToString(", "),
-                "Meses de Poda" to d.mesesPoda.joinToString(", "),
-                "Contagem de Poda" to d.contagemPoda.joinToString(", "),
+                } ?: "N/A"),
+                "Luz Solar" to (d.luzSolar?.joinToString(", ") ?: "N/A"),
+                "Meses de Poda" to (d.mesesPoda?.joinToString(", ") ?: "N/A"),
+                "Contagem de Poda" to (d.contagemPoda?.joinToString(", ") ?: "N/A"),
                 "Possui Sementes" to if (d.possuiSementes) "Sim" else "Não",
                 "Manutenção" to (d.manutencao ?: "N/A"),
                 "Guias de Cuidados (URL)" to (d.guiasCuidadosUrl ?: "N/A"),
-                "Solo" to d.solo.joinToString(", "),
+                "Solo" to (d.solo?.joinToString(", ") ?: "N/A"),
                 "Taxa de Crescimento" to (d.taxaCrescimento ?: "N/A"),
                 "Tolerante à Seca" to if (d.toleranteSeca) "Sim" else "Não",
                 "Tolerante ao Sal" to if (d.toleranteSal) "Sim" else "Não",
@@ -99,7 +99,7 @@ fun DetalhesPlantaTeste(
                 "Tropical" to if (d.tropical) "Sim" else "Não",
                 "Planta de Interior (Indoor)" to if (d.plantaInterior) "Sim" else "Não",
                 "Nível de Cuidado" to (d.nivelCuidados ?: "N/A"),
-                "Suscetibilidade a Pragas" to d.suscetibilidadePragas.joinToString(", "),
+                "Suscetibilidade a Pragas" to (d.suscetibilidadePragas?.joinToString(", ") ?: "N/A"),
                 "Possui Flores" to if (d.possuiFlores) "Sim" else "Não",
                 "Temporada de Floração" to (d.temporadaFloracao ?: "N/A"),
                 "Possui Cones" to if (d.possuiCones) "Sim" else "Não",

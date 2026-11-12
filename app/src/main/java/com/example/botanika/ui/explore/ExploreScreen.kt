@@ -85,14 +85,19 @@ internal fun ExploreScreen(
 ) {
     val plants = viewModel.listaPlantas
 
+    var query by rememberSaveable { mutableStateOf("") }
+    var filter by rememberSaveable { mutableStateOf(PlantFilter.All) }
+
     LaunchedEffect(Unit) {
         if (plants.isEmpty()) {
-            viewModel.carregarPlantas()
+            viewModel.carregarPlantas(query, filter)
         }
     }
 
-    var query by rememberSaveable { mutableStateOf("") }
-    var filter by rememberSaveable { mutableStateOf(PlantFilter.All) }
+    LaunchedEffect(query, filter) {
+        delay(350)
+        viewModel.carregarPlantas(query, filter)
+    }
 
     val visible = remember(plants, query, filter) {
         val q = query.trim().normalizedForSearch()
@@ -102,7 +107,7 @@ internal fun ExploreScreen(
         }
     }
 
-    val sections = remember(plants.size) { List(3 + plants.size) { Animatable(0f) } }
+    val sections = remember(visible.size) { List(3 + visible.size) { Animatable(0f) } }
     LaunchedEffect(sections) {
         val spec = tween<Float>(CONTENT_FADE_MILLIS, easing = EaseInOutSine)
         sections.forEachIndexed { i, a ->
@@ -126,7 +131,7 @@ internal fun ExploreScreen(
             PlantScreenHeader(
                 title = stringResource(R.string.explore_title),
                 onOpenSettings = onOpenSettings,
-                modifier = Modifier.revealed(sections[0])
+                modifier = Modifier.revealed(sections.getOrElse(0) { Animatable(1f) })
             )
 
             Spacer(Modifier.height(20.dp))
@@ -137,7 +142,7 @@ internal fun ExploreScreen(
                 actionIcon = DoodleIconType.Camera,
                 onAction = onCameraSearch,
                 actionDescription = stringResource(R.string.explore_open_camera),
-                modifier = Modifier.revealed(sections[1])
+                modifier = Modifier.revealed(sections.getOrElse(1) { Animatable(1f) })
             )
 
             Spacer(Modifier.height(10.dp))
@@ -145,7 +150,7 @@ internal fun ExploreScreen(
             FilterRow(
                 selected = filter,
                 onSelected = { filter = it },
-                modifier = Modifier.revealed(sections[2])
+                modifier = Modifier.revealed(sections.getOrElse(2) { Animatable(1f) })
             )
 
             Spacer(Modifier.height(10.dp))
@@ -162,14 +167,13 @@ internal fun ExploreScreen(
                 )
             }
 
-            visible.forEach { plant ->
-                val index = plants.indexOf(plant)
+            visible.forEachIndexed { index, plant ->
                 PlantPhotoCard(
                     name = plant.name,
                     subtitle = plant.tags,
                     image = if (!plant.image.isNullOrBlank()) PlantImage.Url(plant.image) else PlantImage.None,
                     onClick = { onPlantClick(plant) },
-                    modifier = Modifier.revealed(sections[3 + index])
+                    modifier = Modifier.revealed(sections.getOrElse(3 + index) { Animatable(1f) })
                 )
                 Spacer(Modifier.height(20.dp))
             }

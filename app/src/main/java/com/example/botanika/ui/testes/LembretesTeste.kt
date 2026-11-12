@@ -80,14 +80,27 @@ fun LembretesTeste(
         Button(
             onClick = {
                 val id = plantaIdText.toIntOrNull() ?: 1
-                val tempo = System.currentTimeMillis() + 10000 // 10 segundos no futuro
-                lembreteService.agendar(context, id, nomePlanta, tempo, mensagemAlarme)
-                status = "Lembrete agendado para daqui a 10 segundos!"
-                carregarLembretes()
+                val reminder = com.example.botanika.ui.plants.Reminder(
+                    id = "",
+                    plantId = id.toString(),
+                    plantName = nomePlanta,
+                    type = com.example.botanika.ui.home.CareType.Water,
+                    dateUtc = com.example.botanika.ui.components.todayUtcMillis(),
+                    hour = 12,
+                    minute = 0,
+                    repeatDays = 0,
+                    note = mensagemAlarme,
+                    notify = true
+                )
+                scope.launch {
+                    lembreteService.salvarEAgendar(context, reminder)
+                    status = "Lembrete agendado!"
+                    carregarLembretes()
+                }
             },
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text("Agendar Lembrete (+10s)")
+            Text("Agendar Lembrete")
         }
 
         if (status.isNotEmpty()) {

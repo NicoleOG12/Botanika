@@ -1,26 +1,29 @@
 package com.example.botanika
 
+import android.app.Application
+import android.content.Context
 import android.net.Uri
 import android.util.Log
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.lifecycle.ViewModel
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.botanika.data.local.LembreteService
 import com.example.botanika.data.remote.PerenualService
 import com.example.botanika.data.remote.PlantaDetalhes
+import com.example.botanika.data.remote.PlantasService
 import com.example.botanika.data.remote.UsuarioService
 import com.example.botanika.ui.components.PlantImage
-import com.example.botanika.ui.components.addDays
 import com.example.botanika.ui.components.todayUtcMillis
 import com.example.botanika.ui.explore.CatalogPlant
 import com.example.botanika.ui.explore.PlantFilter
-import com.example.botanika.ui.home.CareType
 import com.example.botanika.ui.plants.MyPlant
 import com.example.botanika.ui.plants.PlantDraft
-import com.example.botanika.ui.plants.PlantLocation
 import com.example.botanika.ui.plants.Reminder
+import com.example.botanika.ui.plants.toMyPlant
+import com.example.botanika.ui.plants.toPlanta
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -31,55 +34,211 @@ internal enum class Screen {
     PlantDetail, AddPlant, PhotoResult, PlantForm, ReminderForm
 }
 
-internal class BotanikaViewModel : ViewModel() {
-
+internal class BotanikaViewModel(application: Application) : AndroidViewModel(application) {
 
     val usuarioService: UsuarioService = UsuarioService()
     val perenualService: PerenualService = PerenualService()
+    val plantasService: PlantasService = PlantasService()
+    val lembreteService: LembreteService = LembreteService()
     val stack = mutableStateListOf(Screen.Splash)
     val screen: Screen get() = stack.last()
     val TAG = "BotanikaViewModelLog"
     val canGoBack: Boolean get() = stack.size > 1
 
-    fun login(email: String, senha: String, lembrar: Boolean) {
-        viewModelScope.launch {
-            try {
-                val success = usuarioService.fazerLogin(email, senha)
-                if (success) {
-                    push(Screen.Home)
-                }
-            } catch (e: Exception) {
-                Log.d(TAG, "Erro ao logar: $e")
+    var isLoading by mutableStateOf(false)
+        private set
 
+    private val prefs = application.getSharedPreferences("botanika_prefs", Context.MODE_PRIVATE)
+
+    var rememberedEmail by mutableStateOf(prefs.getString("remembered_email", "") ?: "")
+        private set
+
+    var rememberMeChecked by mutableStateOf(prefs.getBoolean("remember_me", false))
+        private set
+
+    var userName by mutableStateOf(usuarioService.usuarioAtual()?.displayName?.ifBlank { null } ?: "Usuário")
+        private set
+
+    init {
+        if (usuarioService.usuarioAtual() != null) {
+            stack.clear()
+            stack.add(Screen.Home)
+            carregarNomeUsuario()
+            carregarJardim()
+        }
+        carregarLembretesLocais()
+    }
+
+    fun carregarNomeUsuario() {
+        val user = usuarioService.usuarioAtual() ?: return
+        val currentDisplay = user.displayName
+        if (!currentDisplay.isNullOrBlank()) {
+            userName = currentDisplay
+        }
+        viewModelScope.launch {
+            val nome = withContext(Dispatchers.IO) {
+                usuarioService.obterNomeUsuario()
+            }
+            if (nome.isNotBlank()) {
+                userName = nome
             }
         }
     }
 
-    // Estado que a UI vai observar
+    fun login(email: String, senha: String, lembrar: Boolean) {
+        viewModelScope.launch {
+            isLoading = true
+            try {
+                val success = withContext(Dispatchers.IO) {
+                    usuarioService.fazerLogin(email, senha)
+                }
+                if (success) {
+                    with(prefs.edit()) {
+                        putBoolean("remember_me", lembrar)
+                        if (lembrar) {
+                            putString("remembered_email", email)
+                        } else {
+                            remove("remembered_email")
+                        }
+                        apply()
+                    }
+                    carregarNomeUsuario()
+                    carregarJardim()
+                    carregarLembretesLocais()
+                    resetTo(Screen.Home)
+                }
+            } catch (e: Exception) {
+                Log.d(TAG, "Erro ao logar: $e")
+            } finally {
+                isLoading = false
+            }
+        }
+    }
+
+    fun register(name: String, email: String, senha: String) {
+        viewModelScope.launch {
+            isLoading = true
+            try {
+                val success = withContext(Dispatchers.IO) {
+                    usuarioService.criarConta(name, email, senha)
+                }
+                if (success) {
+                    val nomeCadastrado = name.trim().ifBlank { "Usuário" }
+                    userName = nomeCadastrado
+                    carregarJardim()
+                    carregarLembretesLocais()
+                    resetTo(Screen.Home)
+                }
+            } catch (e: Exception) {
+                Log.d(TAG, "Erro ao cadastrar: $e")
+            } finally {
+                isLoading = false
+            }
+        }
+    }
+
+    fun logout() {
+        usuarioService.sair()
+        userName = "Usuário"
+        garden.clear()
+        reminders.clear()
+        resetTo(Screen.Welcome)
+    }
+
+    fun carregarJardim() {
+        viewModelScope.launch {
+            isLoading = true
+            try {
+                val plantasRemotas = withContext(Dispatchers.IO) {
+                    if (usuarioService.usuarioAtual() != null) {
+                        plantasService.verPlantasDoUsuario()
+                    } else {
+                        null
+                    }
+                }
+                if (plantasRemotas != null) {
+                    garden.clear()
+                    garden.addAll(plantasRemotas.map { it.toMyPlant() })
+                }
+            } catch (e: Exception) {
+                Log.d(TAG, "Erro ao carregar jardim: $e")
+            } finally {
+                isLoading = false
+            }
+        }
+    }
+
+    fun addPlantToGarden(apiDetail: PlantaDetalhes) {
+        viewModelScope.launch {
+            isLoading = true
+            try {
+                val planta = apiDetail.toPlanta()
+                val sucesso = withContext(Dispatchers.IO) {
+                    plantasService.adicionarPlantaAoJardim(planta)
+                }
+                if (sucesso) {
+                    garden.add(planta.toMyPlant())
+                }
+                resetTo(Screen.Garden)
+            } catch (e: Exception) {
+                Log.d(TAG, "Erro ao adicionar planta ao jardim: $e")
+            } finally {
+                isLoading = false
+            }
+        }
+    }
+
+    fun carregarLembretesLocais() {
+        viewModelScope.launch {
+            try {
+                val locais = withContext(Dispatchers.IO) {
+                    lembreteService.carregarLembretesDoCelular(getApplication())
+                }
+                reminders.clear()
+                reminders.addAll(locais)
+            } catch (e: Exception) {
+                Log.d(TAG, "Erro ao carregar lembretes locais: $e")
+            }
+        }
+    }
+
     var listaPlantas by mutableStateOf<List<CatalogPlant>>(emptyList())
         private set
 
-    fun carregarPlantas() {
-      viewModelScope.launch {
+    fun carregarPlantas(busca: String = "", filtro: PlantFilter = PlantFilter.All) {
+        viewModelScope.launch {
+            isLoading = true
             try {
                 val res = withContext(Dispatchers.IO) {
-                    perenualService.plantas("")
+                    plantasService.buscarPlantasPerenual(busca, filtro)
                 }
                 listaPlantas = res.map { planta ->
+                    val plantFilters = mutableSetOf(PlantFilter.All)
+                    if (planta.isIndoor) plantFilters.add(PlantFilter.Indoor)
+                    if (planta.isSun) plantFilters.add(PlantFilter.Sun)
+
                     CatalogPlant(
                         id = planta.id.toString(),
                         name = planta.nomeComum,
                         tags = planta.nomeCientifico,
-                        image = planta.smallUrl,
-                        filters = setOf(PlantFilter.All)
+                        image = planta.regularUrl
+                            ?: planta.mediumUrl
+                            ?: planta.originalUrl
+                            ?: planta.smallUrl
+                            ?: planta.thumbnail
+                            ?: "",
+                        filters = plantFilters
                     )
                 }
 
             } catch (e: Exception) {
                 Log.d(TAG, "Erro ao buscar plantas: $e")
+            } finally {
+                isLoading = false
             }
         }
     }
+
     fun push(next: Screen) {
         stack.add(next)
     }
@@ -111,36 +270,38 @@ internal class BotanikaViewModel : ViewModel() {
     var reminderPlantId by mutableStateOf<String?>(null)
         private set
 
-
-    var selectedPlantDetail by mutableStateOf<PlantaDetalhes?>(null) // Substitua pelo seu modelo de dados de detalhes
+    var selectedPlantDetail by mutableStateOf<PlantaDetalhes?>(null)
         private set
 
     var isLoadingDetail by mutableStateOf(false)
         private set
 
     fun openCatalogDetail(catalogId: String) {
+        Log.d(TAG, "Chegou em openCatalogDetail: $catalogId")
+
         detailCatalogId = catalogId
         detailPlantId = null
+        selectedPlantDetail = null
 
         viewModelScope.launch {
             isLoadingDetail = true
+            isLoading = true
             try {
-                val plantIdInt = catalogId.toIntOrNull()
-
-                if (plantIdInt != null) {
-                    val plantaDetalhes: PlantaDetalhes? = withContext(Dispatchers.IO) {
-                        perenualService.detalhes(plantIdInt)
-                    }
-                    if(plantaDetalhes != null) {
-                        selectedPlantDetail = plantaDetalhes
-                    }
+                val plantaDetalhes: PlantaDetalhes? = withContext(Dispatchers.IO) {
+                    plantasService.buscarDetalhesPlanta(catalogId)
                 }
+                if (plantaDetalhes != null) {
+                    selectedPlantDetail = plantaDetalhes
+                }
+
+                Log.d(TAG, "Chegou em openCatalogDetail: ${selectedPlantDetail.toString()}")
                 push(Screen.PlantDetail)
 
             } catch (e: Exception) {
                 Log.d(TAG, "Erro ao buscar detalhes da planta: $e")
             } finally {
                 isLoadingDetail = false
+                isLoading = false
             }
         }
     }
@@ -148,6 +309,24 @@ internal class BotanikaViewModel : ViewModel() {
     fun openMyPlantDetail(plantId: String) {
         detailPlantId = plantId
         detailCatalogId = null
+        selectedPlantDetail = null
+
+        val mine = garden.firstOrNull { it.id == plantId }
+        val catId = mine?.catalogId
+        if (!catId.isNullOrBlank()) {
+            viewModelScope.launch {
+                try {
+                    val plantaDetalhes = withContext(Dispatchers.IO) {
+                        plantasService.buscarDetalhesPlanta(catId)
+                    }
+                    if (plantaDetalhes != null) {
+                        selectedPlantDetail = plantaDetalhes
+                    }
+                } catch (e: Exception) {
+                    Log.d(TAG, "Erro ao buscar detalhes da planta do jardim: $e")
+                }
+            }
+        }
         push(Screen.PlantDetail)
     }
 
@@ -167,17 +346,11 @@ internal class BotanikaViewModel : ViewModel() {
         push(Screen.ReminderForm)
     }
 
-    private var nextId = 0
-
     val garden = mutableStateListOf<MyPlant>()
     val reminders = mutableStateListOf<Reminder>()
 
-    init {
-        seedExampleData()
-    }
-
     fun addPlant(plant: MyPlant) {
-        garden.add(plant.copy(id = "p${nextId++}"))
+        garden.add(plant)
     }
 
     fun waterPlant(plantId: String) {
@@ -186,61 +359,57 @@ internal class BotanikaViewModel : ViewModel() {
     }
 
     fun removePlant(plantId: String) {
-        garden.removeAll { it.id == plantId }
-        reminders.removeAll { it.plantId == plantId }
+        viewModelScope.launch {
+            isLoading = true
+            try {
+                val plantIdInt = plantId.toIntOrNull()
+                if (plantIdInt != null) {
+                    withContext(Dispatchers.IO) {
+                        plantasService.removerPlantaDoJardim(plantIdInt)
+                    }
+                }
+                garden.removeAll { it.id == plantId }
+                reminders.removeAll { it.plantId == plantId }
+            } catch (e: Exception) {
+                Log.d(TAG, "Erro ao remover planta: $e")
+            } finally {
+                isLoading = false
+            }
+        }
     }
 
     fun saveReminder(reminder: Reminder) {
-        val index = reminders.indexOfFirst { it.id == reminder.id }
-        if (reminder.id.isEmpty() || index < 0) {
-            reminders.add(reminder.copy(id = "r${nextId++}"))
+        val generatedId = if (reminder.id.isEmpty()) "r_${System.currentTimeMillis()}" else reminder.id
+        val finalReminder = reminder.copy(id = generatedId, notify = true)
+
+        val index = reminders.indexOfFirst { it.id == finalReminder.id }
+        if (index < 0) {
+            reminders.add(finalReminder)
         } else {
-            reminders[index] = reminder
+            reminders[index] = finalReminder
+        }
+
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    lembreteService.salvarEAgendar(getApplication(), finalReminder)
+                }
+            } catch (e: Exception) {
+                Log.d(TAG, "Erro ao salvar lembrete: $e")
+            }
         }
     }
 
     fun deleteReminder(reminderId: String) {
         reminders.removeAll { it.id == reminderId }
-    }
-
-
-
-    fun toggleNotify(reminderId: String) {
-        val index = reminders.indexOfFirst { it.id == reminderId }
-        if (index >= 0) reminders[index] = reminders[index].copy(notify = !reminders[index].notify)
-    }
-
-    private fun seedExampleData() {
-        val today = todayUtcMillis()
-        val monstera = MyPlant(
-            id = "p${nextId++}", catalogId = "monstera", name = "Monstera",
-            image = PlantImage.Res(R.drawable.plant_monstera), location = PlantLocation.Living,
-            wateringEveryDays = 7, lastWateredUtc = addDays(today, -4), notes = ""
-        )
-        val kentia = MyPlant(
-            id = "p${nextId++}", catalogId = "kentia", name = "Palmeira-de-Kentia",
-            image = PlantImage.Res(R.drawable.plant_kentia), location = PlantLocation.Office,
-            wateringEveryDays = 7, lastWateredUtc = addDays(today, -4), notes = ""
-        )
-        val aloe = MyPlant(
-            id = "p${nextId++}", catalogId = "aloe", name = "Babosa",
-            image = PlantImage.Res(R.drawable.plant_aloe), location = PlantLocation.Balcony,
-            wateringEveryDays = 10, lastWateredUtc = addDays(today, -4), notes = ""
-        )
-        garden.addAll(listOf(monstera, kentia, aloe))
-
-        fun reminder(plant: MyPlant, type: CareType, inDays: Int, hour: Int, repeatDays: Int) = Reminder(
-            id = "r${nextId++}", plantId = plant.id, plantName = plant.name, type = type,
-            dateUtc = addDays(today, inDays), hour = hour, minute = 0,
-            repeatDays = repeatDays, note = "", notify = true
-        )
-        reminders.addAll(
-            listOf(
-                reminder(monstera, CareType.Water, 0, 9, 7),
-                reminder(monstera, CareType.Sun, 1, 8, 0),
-                reminder(aloe, CareType.Fertilizer, 3, 10, 30),
-                reminder(kentia, CareType.Pesticide, 5, 17, 0)
-            )
-        )
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    lembreteService.excluirLembreteDoCelular(getApplication(), reminderId)
+                }
+            } catch (e: Exception) {
+                Log.d(TAG, "Erro ao deletar lembrete: $e")
+            }
+        }
     }
 }

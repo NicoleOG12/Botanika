@@ -11,18 +11,21 @@ import javax.net.ssl.HttpsURLConnection
 
 class PerenualApi {
 
-    private val apiKey: String = "sk-pWHU6aedb825b1d5420554"
+    private val apiKey: String = "sk-gfMK6af4d5f3d7aea20554"
     private val baseUrl: String = "https://perenual.com/api/v2"
 
 
-    fun buscarPlantas(busca: String): String?{
+    fun buscarPlantas(busca: String?): String?{
 
-        Log.d("PERENUALLOG", "buscando plantas")
+        Log.d("PERENUALLOG", "buscando plantas: ${busca}")
 
-        val termoCodificado = URLEncoder.encode(busca, StandardCharsets.UTF_8.toString())
+
+
+        val termoCodificado = URLEncoder.encode(busca, StandardCharsets.UTF_8.toString())?: ""
         val uri = URI("${baseUrl}/species-list?key=$apiKey&q=$termoCodificado")
         val url = uri.toURL()
 
+        Log.d("PERENUALLOG", "buscando plantas: ${url}")
 
         Log.d("PERENUALLOG", uri.toString())
 
@@ -58,8 +61,8 @@ class PerenualApi {
             Log.d("PERENUALLOG", "Iniciando abertura de conexão para: $url")
             conexao = url.openConnection() as HttpsURLConnection
             conexao.requestMethod = "GET"
-            conexao.connectTimeout = 8000
-            conexao.readTimeout = 8000
+            conexao.connectTimeout = 180000
+            conexao.readTimeout = 180000
             conexao.doInput = true
 
             Log.d("PERENUALLOG", "Tentando conectar (connect())...")

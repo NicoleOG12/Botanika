@@ -9,9 +9,12 @@ import androidx.room.Query
 interface LembreteDAO {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun criarLembrete(lembreteEntity: LembreteEntity): Long
+    suspend fun salvarLembrete(lembrete: LembreteEntity): Long
 
     @Query("SELECT * FROM lembretes")
     suspend fun listarTodosLembretes(): List<LembreteEntity>
+
+    @Query("DELETE FROM lembretes WHERE id = :id")
+    suspend fun deletarLembretePorId(id: String)
 
 }
