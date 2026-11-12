@@ -21,7 +21,8 @@ import kotlin.math.sin
 enum class DoodleIconType {
     Home, Search, Garden, Calendar, Profile, Settings, Bell, ArrowRight,
     Drop, Sun, Spray, Fertilizer, Camera, AddPlant,
-    ArrowLeft, Plus, Minus, Check, Close, Image, Thermometer, Trash, Clock
+    ArrowLeft, Plus, Minus, Check, Close, Image, Thermometer, Trash, Clock,
+    Edit, Logout, Mail, Lock
 }
 
 private val DropFill = Color(0xFF5AA2FF)
@@ -165,6 +166,26 @@ private object Glyphs {
     )
     val clockHands = pathOf("M12,7 L12,12.2 L15.6,14.2")
 
+    val edit = pathOf(
+        "M4,20 L4.6,15.6 L16.4,3.8 C17.2,3 18.4,3 19.2,3.8 L20.2,4.8 C21,5.6 21,6.8 20.2,7.6 L8.4,19.4 Z " +
+            "M14.6,5.6 L18.4,9.4"
+    )
+
+    val logoutDoor = pathOf("M10,4 L5.4,4.1 C4.6,4.1 4,4.7 4,5.5 L4,18.5 C4,19.3 4.6,19.9 5.4,19.9 L10,20")
+    val logoutArrow = pathOf("M9.5,12 L20,12 M16,8 L20,12 L16,16")
+
+    val mailBody = pathOf(
+        "M3.6,5.8 C9,5.5 15,5.5 20.4,5.8 C20.6,10 20.5,14 20.3,18.2 " +
+            "C15,18.5 9,18.5 3.7,18.2 C3.4,14 3.5,10 3.6,5.8 Z"
+    )
+    val mailFlap = pathOf("M3.8,6.4 C7,9.4 9.6,12 12,13 C14.4,12 17,9.4 20.2,6.4")
+
+    val lockBody = pathOf(
+        "M5.6,10.6 C9,10.4 15,10.4 18.4,10.6 C18.6,13.6 18.5,17 18.3,20 " +
+            "C15,20.2 9,20.2 5.7,20 C5.5,17 5.4,13.6 5.6,10.6 Z"
+    )
+    val lockShackle = pathOf("M8,10.6 C7.9,8 8,5.6 12,5.4 C16,5.6 16.1,8 16,10.6 M12,14.4 L12,16.6")
+
     val gear: Path = Path().apply {
         val teeth = 8
         val profile = listOf(-0.30 to 7.7, -0.17 to 10.0, 0.17 to 10.0, 0.30 to 7.7)
@@ -288,6 +309,23 @@ fun DoodleIcon(
                 DoodleIconType.Clock -> {
                     drawPath(Glyphs.clockRing, color, style = pen)
                     drawPath(Glyphs.clockHands, color, style = pen)
+                }
+
+                DoodleIconType.Edit -> drawPath(Glyphs.edit, color, style = pen)
+
+                DoodleIconType.Logout -> {
+                    drawPath(Glyphs.logoutDoor, color, style = pen)
+                    drawPath(Glyphs.logoutArrow, color, style = pen)
+                }
+
+                DoodleIconType.Mail -> {
+                    drawPath(Glyphs.mailBody, color, style = pen)
+                    drawPath(Glyphs.mailFlap, color, style = pen)
+                }
+
+                DoodleIconType.Lock -> {
+                    drawPath(Glyphs.lockBody, color, style = pen)
+                    drawPath(Glyphs.lockShackle, color, style = pen)
                 }
             }
         }

@@ -173,6 +173,26 @@ class PlantasService {
         }
     }
 
+    suspend fun buscarIdPorNomeCientifico(nomeCientifico: String): String? {
+        for (campo in listOf("scientific_name", "details.scientific_name")) {
+            try {
+                val doc = db.collection("plantas_perenual")
+                    .whereArrayContains(campo, nomeCientifico)
+                    .limit(1)
+                    .get()
+                    .await()
+                    .documents
+                    .firstOrNull() ?: continue
+                return (doc.data?.get("id") as? Number)?.toInt()?.toString() ?: doc.id
+            } catch (e: Exception) {
+                Log.e(TAG, "buscarIdPorNomeCientifico - erro no campo $campo: ${e.localizedMessage}", e)
+            }
+        }
+        return null
+    }
+
+
+
     suspend fun buscarDetalhesPlanta(idPlanta: Int): PlantaDetalhes? {
         return buscarDetalhesPlanta(idPlanta.toString())
     }

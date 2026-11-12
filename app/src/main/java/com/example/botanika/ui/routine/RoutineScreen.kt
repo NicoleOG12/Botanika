@@ -52,6 +52,7 @@ import com.example.botanika.ui.components.PlantScreenHeader
 import com.example.botanika.ui.components.softShadow
 import com.example.botanika.ui.components.DoodleIcon
 import com.example.botanika.ui.components.DoodleIconType
+import com.example.botanika.ui.components.EmptyState
 import com.example.botanika.ui.components.formatDayMonth
 import com.example.botanika.ui.components.todayUtcMillis
 import com.example.botanika.ui.components.utcDay
@@ -189,14 +190,10 @@ internal fun RoutineScreen(
             Spacer(Modifier.height(12.dp))
 
             if (tasks.isEmpty()) {
-                Text(
-                    text = stringResource(R.string.routine_empty),
-                    color = BotanikaMuted,
-                    fontSize = 16.sp,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 32.dp),
-                    textAlign = TextAlign.Center
+                EmptyState(
+                    icon = DoodleIconType.Calendar,
+                    title = stringResource(R.string.routine_empty_title),
+                    hint = stringResource(R.string.routine_empty_hint)
                 )
             }
 

@@ -1,6 +1,7 @@
 package com.example.botanika
 
 import android.app.Application
+import androidx.annotation.StringRes
 import android.content.Context
 import android.net.Uri
 import android.util.Log
@@ -14,6 +15,11 @@ import com.example.botanika.data.local.LembreteService
 import com.example.botanika.data.remote.PerenualService
 import com.example.botanika.data.remote.PlantaDetalhes
 import com.example.botanika.data.remote.PlantasService
+import com.example.botanika.data.remote.AuthErro
+import com.example.botanika.data.remote.PlantNetErro
+import com.example.botanika.data.remote.PlantNetException
+import com.example.botanika.data.remote.PlantNetService
+import com.example.botanika.ui.plants.PlantMatch
 import com.example.botanika.data.remote.UsuarioService
 import com.example.botanika.ui.components.PlantImage
 import com.example.botanika.ui.components.todayUtcMillis
@@ -30,7 +36,7 @@ import kotlinx.coroutines.withContext
 
 internal enum class Screen {
     Splash, Welcome, Login, Register,
-    Home, Explore, Garden, Routine, Camera,
+    Home, Explore, Garden, Routine, Profile, Camera,
     PlantDetail, AddPlant, PhotoResult, PlantForm, ReminderForm
 }
 
@@ -40,6 +46,7 @@ internal class BotanikaViewModel(application: Application) : AndroidViewModel(ap
     val perenualService: PerenualService = PerenualService()
     val plantasService: PlantasService = PlantasService()
     val lembreteService: LembreteService = LembreteService()
+    private val plantNetService: PlantNetService = PlantNetService(plantasService)
     val stack = mutableStateListOf(Screen.Splash)
     val screen: Screen get() = stack.last()
     val TAG = "BotanikaViewModelLog"
@@ -55,6 +62,62 @@ internal class BotanikaViewModel(application: Application) : AndroidViewModel(ap
 
     var rememberMeChecked by mutableStateOf(prefs.getBoolean("remember_me", false))
         private set
+
+    var authError by mutableStateOf<AuthErro?>(null)
+        private set
+
+    var registerSuccess by mutableStateOf(false)
+        private set
+
+    fun clearAuthError() {
+        authError = null
+    }
+
+    var notice by mutableStateOf<Int?>(null)
+        private set
+
+    fun showNotice(@StringRes message: Int) {
+        notice = message
+    }
+
+    fun clearNotice() {
+        notice = null
+    }
+
+    fun updateUserName(newName: String) {
+        val nome = newName.trim()
+        if (nome.isBlank() || nome == userName) return
+        viewModelScope.launch {
+            isLoading = true
+            try {
+                val ok = withContext(Dispatchers.IO) { usuarioService.atualizarNome(nome) }
+                if (ok) {
+                    userName = nome
+                    showNotice(R.string.profile_name_updated)
+                } else {
+                    showNotice(R.string.profile_name_error)
+                }
+            } finally {
+                isLoading = false
+            }
+        }
+    }
+
+    fun sendPasswordReset(email: String) {
+        if (email.isBlank()) {
+            showNotice(R.string.login_error_email_required)
+            return
+        }
+        viewModelScope.launch {
+            isLoading = true
+            try {
+                val ok = withContext(Dispatchers.IO) { usuarioService.enviarRedefinicaoSenha(email) }
+                showNotice(if (ok) R.string.reset_password_sent else R.string.reset_password_error)
+            } finally {
+                isLoading = false
+            }
+        }
+    }
 
     var userName by mutableStateOf(usuarioService.usuarioAtual()?.displayName?.ifBlank { null } ?: "Usuário")
         private set
@@ -88,6 +151,7 @@ internal class BotanikaViewModel(application: Application) : AndroidViewModel(ap
     fun login(email: String, senha: String, lembrar: Boolean) {
         viewModelScope.launch {
             isLoading = true
+            authError = null
             try {
                 val success = withContext(Dispatchers.IO) {
                     usuarioService.fazerLogin(email, senha)
@@ -106,9 +170,12 @@ internal class BotanikaViewModel(application: Application) : AndroidViewModel(ap
                     carregarJardim()
                     carregarLembretesLocais()
                     resetTo(Screen.Home)
+                } else {
+                    authError = usuarioService.ultimoErro ?: AuthErro.Desconhecido
                 }
             } catch (e: Exception) {
                 Log.d(TAG, "Erro ao logar: $e")
+                authError = AuthErro.Desconhecido
             } finally {
                 isLoading = false
             }
@@ -116,21 +183,24 @@ internal class BotanikaViewModel(application: Application) : AndroidViewModel(ap
     }
 
     fun register(name: String, email: String, senha: String) {
+        if (registerSuccess) return
         viewModelScope.launch {
             isLoading = true
+            authError = null
             try {
                 val success = withContext(Dispatchers.IO) {
                     usuarioService.criarConta(name, email, senha)
                 }
                 if (success) {
-                    val nomeCadastrado = name.trim().ifBlank { "Usuário" }
-                    userName = nomeCadastrado
-                    carregarJardim()
-                    carregarLembretesLocais()
-                    resetTo(Screen.Home)
+                    usuarioService.sair()
+                    userName = "Usuário"
+                    registerSuccess = true
+                } else {
+                    authError = usuarioService.ultimoErro ?: AuthErro.Desconhecido
                 }
             } catch (e: Exception) {
                 Log.d(TAG, "Erro ao cadastrar: $e")
+                authError = AuthErro.Desconhecido
             } finally {
                 isLoading = false
             }
@@ -244,6 +314,8 @@ internal class BotanikaViewModel(application: Application) : AndroidViewModel(ap
     }
 
     fun resetTo(next: Screen) {
+        authError = null
+        registerSuccess = false
         stack.clear()
         stack.add(next)
     }
@@ -259,6 +331,15 @@ internal class BotanikaViewModel(application: Application) : AndroidViewModel(ap
         private set
 
     var photo by mutableStateOf<Uri?>(null)
+        private set
+
+    var photoMatches by mutableStateOf<List<PlantMatch>>(emptyList())
+        private set
+
+    var photoAnalyzing by mutableStateOf(false)
+        private set
+
+    var photoError by mutableStateOf<PlantNetErro?>(null)
         private set
 
     var draft by mutableStateOf(PlantDraft(null, "", PlantImage.None))
@@ -332,7 +413,24 @@ internal class BotanikaViewModel(application: Application) : AndroidViewModel(ap
 
     fun openPhotoResult(uri: Uri) {
         photo = uri
+        photoMatches = emptyList()
+        photoError = null
+        photoAnalyzing = true
         push(Screen.PhotoResult)
+
+        viewModelScope.launch {
+            try {
+                photoMatches = plantNetService.identificar(getApplication<Application>().contentResolver, uri)
+            } catch (e: PlantNetException) {
+                Log.d(TAG, "Erro ao identificar planta: ${e.erro}")
+                photoError = e.erro
+            } catch (e: Exception) {
+                Log.d(TAG, "Erro ao identificar planta: $e")
+                photoError = PlantNetErro.Desconhecido
+            } finally {
+                photoAnalyzing = false
+            }
+        }
     }
 
     fun openPlantForm(initial: PlantDraft) {
@@ -355,7 +453,10 @@ internal class BotanikaViewModel(application: Application) : AndroidViewModel(ap
 
     fun waterPlant(plantId: String) {
         val index = garden.indexOfFirst { it.id == plantId }
-        if (index >= 0) garden[index] = garden[index].copy(lastWateredUtc = todayUtcMillis())
+        if (index >= 0) {
+            garden[index] = garden[index].copy(lastWateredUtc = todayUtcMillis())
+            showNotice(R.string.notice_watered)
+        }
     }
 
     fun removePlant(plantId: String) {

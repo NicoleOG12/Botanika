@@ -15,6 +15,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -40,7 +41,8 @@ fun BotanikaLoader(modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.25f)),
+            .background(Color.Black.copy(alpha = 0.25f))
+            .pointerInput(Unit) { awaitPointerEventScope { while (true) awaitPointerEvent() } },
         contentAlignment = Alignment.Center
     ) {
         CircularProgressIndicator(
@@ -75,7 +77,7 @@ fun RoundIconButton(
 @Composable
 fun SettingsButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
     RoundIconButton(
-        icon = DoodleIconType.Settings,
+        icon = DoodleIconType.Profile,
         description = stringResource(R.string.explore_open_settings),
         onClick = onClick,
         modifier = modifier

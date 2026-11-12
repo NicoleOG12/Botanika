@@ -39,4 +39,7 @@ fun formatDayMonth(utcMillis: Long): String =
 fun formatDate(utcMillis: Long): String =
     SimpleDateFormat("dd/MM/yyyy", BrazilLocale).apply { timeZone = Utc }.format(Date(utcMillis))
 
+fun formatMonthYear(utcMillis: Long): String =
+    SimpleDateFormat("MMMM 'de' yyyy", BrazilLocale).apply { timeZone = Utc }.format(Date(utcMillis))
+
 fun formatTime(hour: Int, minute: Int): String = String.format(BrazilLocale, "%02d:%02d", hour, minute)

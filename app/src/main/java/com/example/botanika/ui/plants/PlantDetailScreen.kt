@@ -22,6 +22,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import com.example.botanika.ui.components.ConfirmDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -253,19 +254,16 @@ internal fun PlantDetailScreen(
     }
 
     if (confirmRemove) {
-        AlertDialog(
-            onDismissRequest = { confirmRemove = false },
-            title = { Text(stringResource(R.string.detail_remove_title, name)) },
-            text = { Text(stringResource(R.string.detail_remove_message)) },
-            confirmButton = {
-                TextButton(onClick = {
-                    confirmRemove = false
-                    onRemove()
-                }) { Text(stringResource(R.string.detail_remove), color = BotanikaError, fontWeight = FontWeight.Bold) }
+        ConfirmDialog(
+            title = stringResource(R.string.detail_remove_title, name),
+            message = stringResource(R.string.detail_remove_message),
+            confirmText = stringResource(R.string.detail_remove),
+            destructive = true,
+            onConfirm = {
+                confirmRemove = false
+                onRemove()
             },
-            dismissButton = {
-                TextButton(onClick = { confirmRemove = false }) { Text(stringResource(R.string.common_cancel)) }
-            }
+            onDismiss = { confirmRemove = false }
         )
     }
 }

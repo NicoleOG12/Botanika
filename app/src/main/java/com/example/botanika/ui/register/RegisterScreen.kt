@@ -41,6 +41,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -53,6 +54,7 @@ import com.example.botanika.ui.animation.revealed
 import com.example.botanika.ui.components.AuthIcon
 import com.example.botanika.ui.components.AuthIcons
 import com.example.botanika.ui.components.AuthTextField
+import com.example.botanika.ui.components.BotanikaError
 import com.example.botanika.ui.components.CloudTopShape
 import com.example.botanika.ui.logo.BotanikaFlower
 import com.example.botanika.ui.logo.BotanikaName
@@ -71,12 +73,16 @@ private const val CONTENT_FADE_MILLIS = 800
 private val RegisterFlowerWidth = 150.dp
 private val HeaderMinHeight = 260.dp
 private const val HEADER_FRACTION = 0.32f
+private const val MIN_PASSWORD_LENGTH = 6
 private val CloudBumpHeight = 40.dp
 
 @Composable
 internal fun SharedTransitionScope.RegisterScreen(
     flower: FlowerRender,
     animatedVisibilityScope: AnimatedVisibilityScope,
+    serverError: String? = null,
+    showSuccess: Boolean = false,
+    onSuccessContinue: () -> Unit = {},
     onRegister: (name: String, email: String, password: String) -> Unit,
     onLogin: () -> Unit
 ) {
@@ -127,6 +133,7 @@ internal fun SharedTransitionScope.RegisterScreen(
     val passwordError = when {
         !submitted -> null
         password.isEmpty() -> stringResource(R.string.login_error_password_required)
+        password.length < MIN_PASSWORD_LENGTH -> stringResource(R.string.register_error_password_short)
         else -> null
     }
 
@@ -141,13 +148,17 @@ internal fun SharedTransitionScope.RegisterScreen(
         submitted = true
         val validName = name.isNotBlank()
         val validEmail = email.isNotBlank() && android.util.Patterns.EMAIL_ADDRESS.matcher(email.trim()).matches()
-        val validPassword = password.isNotEmpty()
+        val validPassword = password.length >= MIN_PASSWORD_LENGTH
         val validConfirm = confirmPassword.isNotEmpty() && confirmPassword == password
 
         if (validName && validEmail && validPassword && validConfirm) {
             focusManager.clearFocus()
             onRegister(name.trim(), email.trim(), password)
         }
+    }
+
+    if (showSuccess) {
+        RegisterSuccessDialog(onContinue = onSuccessContinue)
     }
 
     BoxWithConstraints(
@@ -280,7 +291,20 @@ internal fun SharedTransitionScope.RegisterScreen(
                     modifier = Modifier.revealed(confirmPasswordField)
                 )
 
-                Spacer(Modifier.height(28.dp))
+                if (serverError != null) {
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        text = serverError,
+                        color = BotanikaError,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(Modifier.height(12.dp))
+                } else {
+                    Spacer(Modifier.height(28.dp))
+                }
 
                 Button(
                     onClick = ::submit,

@@ -30,6 +30,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
@@ -41,6 +42,7 @@ import com.example.botanika.ui.animation.revealed
 import com.example.botanika.ui.components.BottomNavBar
 import com.example.botanika.ui.components.DoodleIcon
 import com.example.botanika.ui.components.DoodleIconType
+import com.example.botanika.ui.components.EmptyState
 import com.example.botanika.ui.components.MainTab
 import com.example.botanika.ui.components.PlantScreenHeader
 import com.example.botanika.ui.components.Sparkle
@@ -73,13 +75,14 @@ internal fun HomeScreen(
     userName: String = "Usuário",
     plantCount: Int = 0,
     tasks: List<CareTask> = emptyList(),
+    thirstyCount: Int = 0,
     onOpenSettings: () -> Unit = {},
     onOpenGarden: () -> Unit = {},
     onSeeAllTasks: () -> Unit = {},
     onDeleteTask: (CareTask) -> Unit = {},
     onTabSelected: (MainTab) -> Unit = {}
 ) {
-    val sections = remember(tasks.size) { List(3 + tasks.size) { Animatable(0f) } }
+    val sections = remember(tasks.size) { List(4 + tasks.size) { Animatable(0f) } }
 
     LaunchedEffect(sections) {
         val spec = tween<Float>(CONTENT_FADE_MILLIS, easing = EaseInOutSine)
@@ -102,7 +105,7 @@ internal fun HomeScreen(
                 .padding(horizontal = 24.dp)
         ) {
             PlantScreenHeader(
-                title = stringResource(R.string.home_greeting, userName),
+                title = stringResource(R.string.home_greeting, userName.trim().substringBefore(' ')),
                 subtitle = stringResource(R.string.home_subtitle),
                 onOpenSettings = onOpenSettings,
                 modifier = Modifier.revealed(sections[0])
@@ -116,12 +119,21 @@ internal fun HomeScreen(
                 modifier = Modifier.revealed(sections[1])
             )
 
+            if (thirstyCount > 0) {
+                Spacer(Modifier.height(16.dp))
+                ThirstyBanner(
+                    count = thirstyCount,
+                    onClick = onOpenGarden,
+                    modifier = Modifier.revealed(sections[2])
+                )
+            }
+
             Spacer(Modifier.height(28.dp))
 
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .revealed(sections[2]),
+                    .revealed(sections[3]),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -152,22 +164,29 @@ internal fun HomeScreen(
             Spacer(Modifier.height(8.dp))
 
             if (tasks.isEmpty()) {
-                Text(
-                    text = stringResource(R.string.routine_empty),
-                    color = BotanikaMuted,
-                    fontSize = 16.sp,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 32.dp),
-                    textAlign = TextAlign.Center
-                )
+                if (plantCount == 0) {
+                    EmptyState(
+                        icon = DoodleIconType.Garden,
+                        title = stringResource(R.string.garden_empty_title),
+                        hint = stringResource(R.string.home_empty_garden_hint),
+                        actionText = stringResource(R.string.garden_add_plant),
+                        actionIcon = DoodleIconType.AddPlant,
+                        onAction = onOpenGarden
+                    )
+                } else {
+                    EmptyState(
+                        icon = DoodleIconType.Calendar,
+                        title = stringResource(R.string.routine_empty_title),
+                        hint = stringResource(R.string.routine_empty_hint)
+                    )
+                }
             }
 
             tasks.forEachIndexed { i, task ->
                 CareTaskCard(
                     task = task,
                     onDelete = { onDeleteTask(task) },
-                    modifier = Modifier.revealed(sections[3 + i])
+                    modifier = Modifier.revealed(sections[4 + i])
                 )
                 Spacer(Modifier.height(12.dp))
             }
@@ -176,6 +195,46 @@ internal fun HomeScreen(
         }
 
         BottomNavBar(selected = MainTab.Home, onSelected = onTabSelected)
+    }
+}
+
+@Composable
+private fun ThirstyBanner(count: Int, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val shape = RoundedCornerShape(22.dp)
+    Row(
+        modifier = modifier
+            .bounceClickable(onClick = onClick)
+            .fillMaxWidth()
+            .softShadow(shape, 6.dp)
+            .clip(shape)
+            .background(Color(0xFFE6F0FF))
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(46.dp)
+                .background(Color.White, CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            DoodleIcon(DoodleIconType.Drop, Modifier.size(28.dp))
+        }
+        Spacer(Modifier.width(14.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                text = stringResource(R.string.home_thirsty_title),
+                color = BotanikaGreen,
+                fontSize = 17.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = pluralStringResource(R.plurals.home_thirsty_message, count, count),
+                color = BotanikaMuted,
+                fontSize = 14.sp,
+                lineHeight = 19.sp
+            )
+        }
+        DoodleIcon(DoodleIconType.ArrowRight, Modifier.size(22.dp))
     }
 }
 

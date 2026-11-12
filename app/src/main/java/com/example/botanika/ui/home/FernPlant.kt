@@ -26,7 +26,7 @@ import kotlin.math.PI
 import kotlin.math.sin
 
 private const val SWAY_PERIOD_MILLIS = 5200
-private const val MAX_SWAY_DEGREES = 2.6f
+private const val MAX_SWAY_DEGREES = 10.6f
 
 private class FernPiece(val path: Path, val color: Color, val sways: Boolean, val height: Float)
 

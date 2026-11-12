@@ -45,6 +45,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -57,6 +58,7 @@ import com.example.botanika.ui.animation.revealed
 import com.example.botanika.ui.components.AuthIcon
 import com.example.botanika.ui.components.AuthIcons
 import com.example.botanika.ui.components.AuthTextField
+import com.example.botanika.ui.components.BotanikaError
 import com.example.botanika.ui.components.CloudTopShape
 import com.example.botanika.ui.logo.BotanikaFlower
 import com.example.botanika.ui.logo.BotanikaName
@@ -83,8 +85,9 @@ internal fun SharedTransitionScope.LoginScreen(
     animatedVisibilityScope: AnimatedVisibilityScope,
     initialEmail: String = "",
     initialRemember: Boolean = false,
+    serverError: String? = null,
     onLogin: (email: String, password: String, remember: Boolean) -> Unit,
-    onForgotPassword: () -> Unit,
+    onForgotPassword: (email: String) -> Unit,
     onSignUp: () -> Unit
 ) {
     var email by rememberSaveable { mutableStateOf(initialEmail) }
@@ -233,12 +236,25 @@ internal fun SharedTransitionScope.LoginScreen(
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier
-                            .clickable(onClick = onForgotPassword)
+                            .clickable { onForgotPassword(email.trim()) }
                             .padding(vertical = 8.dp)
                     )
                 }
 
-                Spacer(Modifier.height(36.dp))
+                if (serverError != null) {
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        text = serverError,
+                        color = BotanikaError,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(Modifier.height(12.dp))
+                } else {
+                    Spacer(Modifier.height(36.dp))
+                }
 
                 Button(
                     onClick = ::submit,

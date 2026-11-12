@@ -18,11 +18,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -48,35 +45,25 @@ import com.example.botanika.ui.theme.BotanikaMuted
 import com.example.botanika.ui.theme.BotanikaOutline
 import com.example.botanika.ui.theme.BotanikaRose
 import com.example.botanika.ui.theme.BotanikaSage
-import kotlinx.coroutines.delay
-
-private const val ANALYZE_MILLIS = 1800L
 
 @Composable
 internal fun PhotoResultScreen(
     photo: Uri,
+    analyzing: Boolean,
+    matches: List<PlantMatch>,
+    errorMessage: String?,
     onBack: () -> Unit,
     onViewInfo: (PlantInfo) -> Unit,
     onAddToGarden: (PlantInfo) -> Unit
 ) {
-    var analyzing by rememberSaveable(photo) { mutableStateOf(true) }
     var selected by rememberSaveable(photo) { mutableIntStateOf(0) }
-    val matches = remember(photo) { PlantGuides.identify(photo.toString().hashCode()) }
-
-    LaunchedEffect(photo) {
-        if (analyzing) {
-            delay(ANALYZE_MILLIS)
-            analyzing = false
-        }
-    }
-
-    val chosen = matches[selected].plant
+    val chosen = matches.getOrNull(selected)?.plant
 
     FormScreen(
         title = stringResource(R.string.result_title),
         onBack = onBack,
         bottomBar = {
-            if (!analyzing) {
+            if (!analyzing && chosen != null) {
                 PrimaryButton(
                     text = stringResource(R.string.result_add),
                     onClick = { onAddToGarden(chosen) },
@@ -84,11 +71,13 @@ internal fun PhotoResultScreen(
                 )
                 Spacer(Modifier.height(10.dp))
                 Row(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(10.dp)) {
-                    SecondaryButton(
-                        text = stringResource(R.string.result_view_info),
-                        onClick = { onViewInfo(chosen) },
-                        modifier = Modifier.weight(1f)
-                    )
+                    if (chosen.id.isNotBlank()) {
+                        SecondaryButton(
+                            text = stringResource(R.string.result_view_info),
+                            onClick = { onViewInfo(chosen) },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
                     SecondaryButton(
                         text = stringResource(R.string.result_retry),
                         onClick = onBack,
@@ -133,6 +122,13 @@ internal fun PhotoResultScreen(
                     fontWeight = FontWeight.SemiBold
                 )
             }
+        } else if (matches.isEmpty()) {
+            Text(
+                text = errorMessage ?: stringResource(R.string.result_none),
+                color = BotanikaMuted,
+                fontSize = 15.sp,
+                lineHeight = 21.sp
+            )
         } else {
             Text(
                 text = stringResource(R.string.result_hint),

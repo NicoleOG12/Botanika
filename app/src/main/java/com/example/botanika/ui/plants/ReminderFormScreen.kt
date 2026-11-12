@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
+import com.example.botanika.ui.components.ConfirmDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -304,19 +305,16 @@ internal fun ReminderFormScreen(
         )
     }
     if (confirmDelete && existing != null) {
-        AlertDialog(
-            onDismissRequest = { confirmDelete = false },
-            title = { Text(stringResource(R.string.reminder_delete_title)) },
-            text = { Text(stringResource(R.string.reminder_delete_message)) },
-            confirmButton = {
-                TextButton(onClick = {
-                    confirmDelete = false
-                    onDelete(existing)
-                }) { Text(stringResource(R.string.reminder_delete), color = BotanikaError, fontWeight = FontWeight.Bold) }
+        ConfirmDialog(
+            title = stringResource(R.string.reminder_delete_title),
+            message = stringResource(R.string.reminder_delete_message),
+            confirmText = stringResource(R.string.reminder_delete),
+            destructive = true,
+            onConfirm = {
+                confirmDelete = false
+                onDelete(existing)
             },
-            dismissButton = {
-                TextButton(onClick = { confirmDelete = false }) { Text(stringResource(R.string.common_cancel)) }
-            }
+            onDismiss = { confirmDelete = false }
         )
     }
 }

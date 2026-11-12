@@ -12,11 +12,16 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.botanika.data.remote.AuthErro
+import com.example.botanika.data.remote.PlantNetErro
 import com.example.botanika.ui.camera.CameraScreen
 import com.example.botanika.ui.components.BotanikaLoader
+import com.example.botanika.ui.components.BotanikaToast
 import com.example.botanika.ui.components.MainTab
 import com.example.botanika.ui.components.PlantImage
 import com.example.botanika.ui.components.todayUtcMillis
@@ -36,6 +41,7 @@ import com.example.botanika.ui.plants.isFuture
 import com.example.botanika.ui.plants.nextOccurrence
 import com.example.botanika.ui.plants.toCareTask
 import com.example.botanika.ui.plants.toPlantInfo
+import com.example.botanika.ui.profile.ProfileScreen
 import com.example.botanika.ui.register.RegisterScreen
 import com.example.botanika.ui.routine.RoutineScreen
 import com.example.botanika.ui.splash.SplashScreen
@@ -43,7 +49,33 @@ import com.example.botanika.ui.theme.BotanikaPink
 import com.example.botanika.ui.welcome.WelcomeScreen
 
 private const val SCREEN_FADE_MILLIS = 600
+private const val TAB_FADE_MILLIS = 220
 private const val HOME_TASKS = 4
+
+private val IntroScreens = setOf(Screen.Splash, Screen.Welcome, Screen.Login, Screen.Register)
+
+@Composable
+private fun authErrorMessage(error: AuthErro?): String? = when (error) {
+    null -> null
+    AuthErro.SenhaCurta -> stringResource(R.string.register_error_password_short)
+    AuthErro.EmailInvalido -> stringResource(R.string.login_error_email_invalid)
+    AuthErro.EmailEmUso -> stringResource(R.string.auth_error_email_in_use)
+    AuthErro.CredenciaisInvalidas -> stringResource(R.string.auth_error_invalid_credentials)
+    AuthErro.SemRede -> stringResource(R.string.auth_error_network)
+    AuthErro.FalhaAoSalvarPerfil -> stringResource(R.string.auth_error_profile)
+    AuthErro.Desconhecido -> stringResource(R.string.auth_error_unknown)
+}
+
+@Composable
+private fun plantNetErrorMessage(error: PlantNetErro?): String? = when (error) {
+    null -> null
+    PlantNetErro.SemChave -> stringResource(R.string.plantnet_error_no_key)
+    PlantNetErro.SemRede -> stringResource(R.string.auth_error_network)
+    PlantNetErro.ChaveInvalida -> stringResource(R.string.plantnet_error_invalid_key)
+    PlantNetErro.LimiteExcedido -> stringResource(R.string.plantnet_error_limit)
+    PlantNetErro.FotoInvalida -> stringResource(R.string.plantnet_error_photo)
+    PlantNetErro.Desconhecido -> stringResource(R.string.auth_error_unknown)
+}
 
 @Composable
 internal fun BotanikaApp(vm: BotanikaViewModel = viewModel()) {
@@ -57,14 +89,22 @@ internal fun BotanikaApp(vm: BotanikaViewModel = viewModel()) {
 
     BackHandler(enabled = vm.canGoBack) { vm.back() }
 
-    val goToTab: (MainTab) -> Unit = { tab -> tabScreen(tab)?.let(vm::resetTo) }
+    val goToTab: (MainTab) -> Unit = { tab ->
+        if (tabScreen(tab) != vm.screen) tabScreen(tab)?.let(vm::resetTo)
+    }
+    val openProfile: () -> Unit = { goToTab(MainTab.Profile) }
 
     Box(Modifier.fillMaxSize()) {
         SharedTransitionLayout {
             AnimatedContent(
                 targetState = vm.screen,
                 transitionSpec = {
-                    fadeIn(tween(SCREEN_FADE_MILLIS)) togetherWith fadeOut(tween(SCREEN_FADE_MILLIS))
+                    val millis = if (initialState in IntroScreens || targetState in IntroScreens) {
+                        SCREEN_FADE_MILLIS
+                    } else {
+                        TAB_FADE_MILLIS
+                    }
+                    fadeIn(tween(millis)) togetherWith fadeOut(tween(millis))
                 },
                 label = "screen"
             ) { target ->
@@ -86,16 +126,20 @@ internal fun BotanikaApp(vm: BotanikaViewModel = viewModel()) {
                         animatedVisibilityScope = this,
                         initialEmail = vm.rememberedEmail,
                         initialRemember = vm.rememberMeChecked,
+                        serverError = authErrorMessage(vm.authError),
                         onLogin = { email, senha, lembrar ->
                             vm.login(email, senha, lembrar)
                         },
-                        onForgotPassword = {},
+                        onForgotPassword = vm::sendPasswordReset,
                         onSignUp = { vm.resetTo(Screen.Register) }
                     )
 
                     Screen.Register -> RegisterScreen(
                         flower = flower,
                         animatedVisibilityScope = this,
+                        serverError = authErrorMessage(vm.authError),
+                        showSuccess = vm.registerSuccess,
+                        onSuccessContinue = { vm.resetTo(Screen.Login) },
                         onRegister = { name, email, password ->
                             vm.register(name, email, password)
                         },
@@ -114,6 +158,8 @@ internal fun BotanikaApp(vm: BotanikaViewModel = viewModel()) {
                             userName = vm.userName,
                             plantCount = vm.garden.size,
                             tasks = tasks,
+                            thirstyCount = vm.garden.count { it.nextWateringUtc <= today },
+                            onOpenSettings = openProfile,
                             onOpenGarden = { vm.resetTo(Screen.Garden) },
                             onSeeAllTasks = { vm.resetTo(Screen.Routine) },
                             onDeleteTask = { vm.deleteReminder(it.id) },
@@ -123,6 +169,7 @@ internal fun BotanikaApp(vm: BotanikaViewModel = viewModel()) {
 
                     Screen.Explore -> ExploreScreen(
                         viewModel = vm,
+                        onOpenSettings = openProfile,
                         onCameraSearch = { vm.push(Screen.Camera) },
                         onPlantClick = { vm.openCatalogDetail(it.id) },
                         onTabSelected = goToTab
@@ -142,8 +189,27 @@ internal fun BotanikaApp(vm: BotanikaViewModel = viewModel()) {
                         }
                         GardenScreen(
                             plants = vm.garden,
+                            onOpenSettings = openProfile,
                             onAddPlant = { vm.push(Screen.AddPlant) },
                             onPlantClick = { vm.openMyPlantDetail(it.id) },
+                            onTabSelected = goToTab
+                        )
+                    }
+
+                    Screen.Profile -> {
+                        val today = todayUtcMillis()
+                        ProfileScreen(
+                            userName = vm.userName,
+                            email = vm.usuarioService.usuarioAtual()?.email.orEmpty(),
+                            memberSinceMillis = vm.usuarioService.criadoEmMillis(),
+                            plantCount = vm.garden.size,
+                            reminderCount = vm.reminders.count { it.isFuture() },
+                            thirstyCount = vm.garden.count { it.nextWateringUtc <= today },
+                            onEditName = vm::updateUserName,
+                            onResetPassword = {
+                                vm.sendPasswordReset(vm.usuarioService.usuarioAtual()?.email.orEmpty())
+                            },
+                            onLogout = vm::logout,
                             onTabSelected = goToTab
                         )
                     }
@@ -154,6 +220,7 @@ internal fun BotanikaApp(vm: BotanikaViewModel = viewModel()) {
                         }
                         RoutineScreen(
                             reminders = vm.reminders,
+                            onOpenSettings = openProfile,
                             onNewReminder = { vm.openReminderForm() },
                             onEditReminder = { vm.openReminderForm(reminderId = it.id) },
                             onDeleteReminder = { vm.deleteReminder(it.id) },
@@ -174,11 +241,14 @@ internal fun BotanikaApp(vm: BotanikaViewModel = viewModel()) {
                         if (photo != null) {
                             PhotoResultScreen(
                                 photo = photo,
+                                analyzing = vm.photoAnalyzing,
+                                matches = vm.photoMatches,
+                                errorMessage = plantNetErrorMessage(vm.photoError),
                                 onBack = vm::back,
                                 onViewInfo = { vm.openCatalogDetail(it.id) },
                                 onAddToGarden = { info ->
                                     vm.openPlantForm(
-                                        PlantDraft(info.id, info.name, PlantImage.Photo(photo))
+                                        PlantDraft(info.id.ifBlank { null }, info.name ?: info.scientific, PlantImage.Photo(photo))
                                     )
                                 }
                             )
@@ -262,6 +332,12 @@ internal fun BotanikaApp(vm: BotanikaViewModel = viewModel()) {
             }
         }
 
+        BotanikaToast(
+            message = vm.notice?.let { stringResource(it) },
+            onDismiss = vm::clearNotice,
+            modifier = Modifier.align(Alignment.BottomCenter)
+        )
+
         if (vm.isLoading) {
             BotanikaLoader()
         }
@@ -273,5 +349,5 @@ private fun tabScreen(tab: MainTab): Screen? = when (tab) {
     MainTab.Explore -> Screen.Explore
     MainTab.Garden -> Screen.Garden
     MainTab.Routine -> Screen.Routine
-    MainTab.Profile -> null
+    MainTab.Profile -> Screen.Profile
 }

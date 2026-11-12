@@ -45,6 +45,7 @@ import com.example.botanika.R
 import com.example.botanika.ui.animation.revealed
 import com.example.botanika.ui.components.BottomNavBar
 import com.example.botanika.ui.components.DoodleIconType
+import com.example.botanika.ui.components.EmptyState
 import com.example.botanika.ui.components.MainTab
 import com.example.botanika.ui.components.PlantImage
 import com.example.botanika.ui.components.PlantPhotoCard
@@ -156,14 +157,10 @@ internal fun ExploreScreen(
             Spacer(Modifier.height(10.dp))
 
             if (visible.isEmpty()) {
-                Text(
-                    text = stringResource(R.string.explore_empty),
-                    color = BotanikaMuted,
-                    fontSize = 16.sp,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 48.dp),
-                    textAlign = TextAlign.Center
+                EmptyState(
+                    icon = DoodleIconType.Search,
+                    title = stringResource(R.string.explore_empty),
+                    hint = stringResource(R.string.explore_empty_hint)
                 )
             }
 

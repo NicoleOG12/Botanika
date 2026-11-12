@@ -36,7 +36,7 @@ import com.example.botanika.ui.components.PlantPhotoCard
 import com.example.botanika.ui.components.gardenBackdrop
 import com.example.botanika.ui.components.PlantScreenHeader
 import com.example.botanika.ui.components.PlantSearchBar
-import com.example.botanika.ui.components.PrimaryButton
+import com.example.botanika.ui.components.EmptyState
 import com.example.botanika.ui.components.formatDate
 import com.example.botanika.ui.components.normalizedForSearch
 import com.example.botanika.ui.plants.MyPlant
@@ -103,43 +103,20 @@ internal fun GardenScreen(
             Spacer(Modifier.height(20.dp))
 
             if (plants.isEmpty()) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 40.dp)
-                        .revealed(sections[2]),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text(
-                        text = stringResource(R.string.garden_empty_title),
-                        color = BotanikaMuted,
-                        fontSize = 18.sp,
-                        textAlign = TextAlign.Center
-                    )
-                    Spacer(Modifier.height(6.dp))
-                    Text(
-                        text = stringResource(R.string.garden_empty_hint),
-                        color = BotanikaMuted,
-                        fontSize = 15.sp,
-                        lineHeight = 21.sp,
-                        textAlign = TextAlign.Center
-                    )
-                    Spacer(Modifier.height(24.dp))
-                    PrimaryButton(
-                        text = stringResource(R.string.garden_add_plant),
-                        onClick = onAddPlant,
-                        icon = DoodleIconType.AddPlant
-                    )
-                }
+                EmptyState(
+                    icon = DoodleIconType.Garden,
+                    title = stringResource(R.string.garden_empty_title),
+                    hint = stringResource(R.string.garden_empty_hint),
+                    actionText = stringResource(R.string.garden_add_plant),
+                    actionIcon = DoodleIconType.AddPlant,
+                    onAction = onAddPlant,
+                    modifier = Modifier.revealed(sections[2])
+                )
             } else if (visible.isEmpty()) {
-                Text(
-                    text = stringResource(R.string.garden_empty),
-                    color = BotanikaMuted,
-                    fontSize = 16.sp,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 48.dp),
-                    textAlign = TextAlign.Center
+                EmptyState(
+                    icon = DoodleIconType.Search,
+                    title = stringResource(R.string.garden_empty),
+                    hint = stringResource(R.string.garden_search_empty_hint)
                 )
             }
 
