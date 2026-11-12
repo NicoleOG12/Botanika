@@ -50,6 +50,8 @@ internal class BotanikaViewModel(application: Application) : AndroidViewModel(ap
     val lembreteService: LembreteService = LembreteService()
     private val plantNetService: PlantNetService = PlantNetService(plantasService)
     val stack = mutableStateListOf(Screen.Splash)
+    val garden = mutableStateListOf<MyPlant>()
+    val reminders = mutableStateListOf<Reminder>()
     val screen: Screen get() = stack.last()
     val TAG = "BotanikaViewModelLog"
     val canGoBack: Boolean get() = stack.size > 1
@@ -497,9 +499,6 @@ internal class BotanikaViewModel(application: Application) : AndroidViewModel(ap
         reminderPlantId = plantId
         push(Screen.ReminderForm)
     }
-
-    val garden = mutableStateListOf<MyPlant>()
-    val reminders = mutableStateListOf<Reminder>()
 
     fun addPlant(plant: MyPlant) {
         garden.add(plant)
