@@ -17,6 +17,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -37,12 +38,16 @@ import com.example.botanika.ui.components.FormTextField
 import com.example.botanika.ui.components.OptionChip
 import com.example.botanika.ui.components.PickerField
 import com.example.botanika.ui.components.PrimaryButton
-import com.example.botanika.ui.components.SwitchRow
+import com.example.botanika.ui.components.addDays
 import com.example.botanika.ui.components.formatDate
 import com.example.botanika.ui.components.formatTime
 import com.example.botanika.ui.components.todayUtcMillis
+import com.example.botanika.ui.components.utcDay
+import com.example.botanika.ui.components.utcMonth
+import com.example.botanika.ui.components.utcYear
 import com.example.botanika.ui.home.CareType
 import com.example.botanika.ui.theme.BotanikaMuted
+import java.util.Calendar
 
 @Composable
 internal fun ReminderFormScreen(
@@ -65,11 +70,30 @@ internal fun ReminderFormScreen(
         mutableStateOf(RepeatOption.entries.firstOrNull { it.days == existing?.repeatDays } ?: RepeatOption.Never)
     }
     var note by rememberSaveable { mutableStateOf(existing?.note ?: "") }
-    var notify by rememberSaveable { mutableStateOf(existing?.notify ?: true) }
     var plantError by rememberSaveable { mutableStateOf(false) }
+    var dateError by rememberSaveable { mutableStateOf(false) }
     var showDatePicker by rememberSaveable { mutableStateOf(false) }
     var showTimePicker by rememberSaveable { mutableStateOf(false) }
     var confirmDelete by rememberSaveable { mutableStateOf(false) }
+
+    val targetTime = remember(date, hour, minute, repeat) {
+        val year = utcYear(date)
+        val month = utcMonth(date)
+        val day = utcDay(date)
+        val cal = Calendar.getInstance().apply {
+            clear()
+            set(year, month - 1, day, hour, minute, 0)
+        }
+        var time = cal.timeInMillis
+        if (repeat.days > 0) {
+            val now = System.currentTimeMillis()
+            while (time <= now) {
+                time = addDays(time, repeat.days)
+            }
+        }
+        time
+    }
+    val isPast = targetTime <= System.currentTimeMillis()
 
     FormScreen(
         title = stringResource(if (existing == null) R.string.reminder_title_new else R.string.reminder_title_edit),
@@ -81,7 +105,9 @@ internal fun ReminderFormScreen(
                 enabled = plants.isNotEmpty(),
                 onClick = {
                     val chosen = plants.firstOrNull { it.id == plantId }
-                    if (chosen == null) {
+                    if (isPast) {
+                        dateError = true
+                    } else if (chosen == null) {
                         plantError = true
                     } else {
                         onSave(
@@ -95,7 +121,7 @@ internal fun ReminderFormScreen(
                                 minute = minute,
                                 repeatDays = repeat.days,
                                 note = note.trim(),
-                                notify = notify
+                                notify = true
                             )
                         )
                     }
@@ -191,7 +217,10 @@ internal fun ReminderFormScreen(
                 PickerField(
                     value = formatDate(date),
                     icon = DoodleIconType.Calendar,
-                    onClick = { showDatePicker = true }
+                    onClick = {
+                        dateError = false
+                        showDatePicker = true
+                    }
                 )
             }
             androidx.compose.foundation.layout.Column(Modifier.weight(1f)) {
@@ -199,9 +228,21 @@ internal fun ReminderFormScreen(
                 PickerField(
                     value = formatTime(hour, minute),
                     icon = DoodleIconType.Clock,
-                    onClick = { showTimePicker = true }
+                    onClick = {
+                        dateError = false
+                        showTimePicker = true
+                    }
                 )
             }
+        }
+
+        if (dateError) {
+            Text(
+                text = stringResource(R.string.reminder_error_past),
+                color = BotanikaError,
+                fontSize = 12.sp,
+                modifier = Modifier.padding(start = 4.dp, top = 4.dp)
+            )
         }
 
         Spacer(Modifier.height(20.dp))
@@ -217,7 +258,10 @@ internal fun ReminderFormScreen(
                 OptionChip(
                     text = stringResource(option.label),
                     selected = option == repeat,
-                    onClick = { repeat = option }
+                    onClick = {
+                        dateError = false
+                        repeat = option
+                    }
                 )
             }
         }
@@ -235,22 +279,16 @@ internal fun ReminderFormScreen(
                 imeAction = ImeAction.Default
             )
         )
-
-        Spacer(Modifier.height(20.dp))
-
-        SwitchRow(
-            title = stringResource(R.string.reminder_notify),
-            subtitle = stringResource(R.string.reminder_notify_sub),
-            checked = notify,
-            onCheckedChange = { notify = it }
-        )
     }
 
     if (showDatePicker) {
         BotanikaDatePickerDialog(
             initialUtcMillis = date,
             onDismiss = { showDatePicker = false },
-            onConfirm = { date = it }
+            onConfirm = {
+                date = it
+                dateError = false
+            }
         )
     }
     if (showTimePicker) {
@@ -261,6 +299,7 @@ internal fun ReminderFormScreen(
             onConfirm = { h, m ->
                 hour = h
                 minute = m
+                dateError = false
             }
         )
     }

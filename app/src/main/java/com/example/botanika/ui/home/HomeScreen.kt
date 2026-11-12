@@ -65,22 +65,22 @@ data class CareTask(
     val plant: String,
     val type: CareType,
     val date: String,
-    val id: String = "",
-    val notify: Boolean = true
+    val id: String = ""
 )
 
 @Composable
 internal fun HomeScreen(
-    userName: String = "Nicole",
+    userName: String = "Usuário",
     plantCount: Int = 0,
     tasks: List<CareTask> = emptyList(),
     onOpenSettings: () -> Unit = {},
     onOpenGarden: () -> Unit = {},
     onSeeAllTasks: () -> Unit = {},
-    onTaskReminder: (CareTask) -> Unit = {},
+    onDeleteTask: (CareTask) -> Unit = {},
     onTabSelected: (MainTab) -> Unit = {}
 ) {
     val sections = remember(tasks.size) { List(3 + tasks.size) { Animatable(0f) } }
+
     LaunchedEffect(sections) {
         val spec = tween<Float>(CONTENT_FADE_MILLIS, easing = EaseInOutSine)
         sections.forEachIndexed { i, a ->
@@ -166,7 +166,7 @@ internal fun HomeScreen(
             tasks.forEachIndexed { i, task ->
                 CareTaskCard(
                     task = task,
-                    onReminder = { onTaskReminder(task) },
+                    onDelete = { onDeleteTask(task) },
                     modifier = Modifier.revealed(sections[3 + i])
                 )
                 Spacer(Modifier.height(12.dp))

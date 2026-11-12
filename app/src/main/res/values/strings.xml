@@ -165,6 +165,7 @@
     <string name="reminder_plant">Planta</string>
     <string name="reminder_no_plants">Você precisa ter uma planta no jardim para criar um aviso.</string>
     <string name="reminder_error_plant">Escolha uma planta.</string>
+    <string name="reminder_error_past">A data e hora do aviso devem ser no futuro.</string>
     <string name="reminder_type">Tipo de cuidado</string>
     <string name="reminder_date">Data</string>
     <string name="reminder_time">Hora</string>

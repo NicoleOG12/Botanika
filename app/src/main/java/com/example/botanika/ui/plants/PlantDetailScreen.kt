@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
@@ -74,9 +75,10 @@ internal fun PlantDetailScreen(
     reminders: List<Reminder>,
     onBack: () -> Unit,
     onAddToGarden: () -> Unit,
-    onWater: () -> Unit,
+    onWater: () -> Unit = {},
     onCreateReminder: () -> Unit,
     onEditReminder: (Reminder) -> Unit,
+    onDeleteReminder: (Reminder) -> Unit = {},
     onRemove: () -> Unit
 ) {
     var confirmRemove by rememberSaveable { mutableStateOf(false) }
@@ -148,16 +150,20 @@ internal fun PlantDetailScreen(
 
                         Spacer(Modifier.height(24.dp))
                         SectionTitle(stringResource(R.string.detail_about))
-                        Text(
-                            text = info.description,
-                            color = BotanikaMuted,
-                            fontSize = 16.sp,
-                            lineHeight = 24.sp
-                        )
+                        info.description?.let {
+                            Text(
+                                text = it,
+                                color = BotanikaMuted,
+                                fontSize = 16.sp,
+                                lineHeight = 24.sp
+                            )
+                        }
 
-                        Spacer(Modifier.height(24.dp))
-                        SectionTitle(stringResource(R.string.detail_tips))
-                        info.tips.forEach { tip -> TipRow(tip) }
+                        if (!info.tips.isNullOrEmpty()) {
+                            Spacer(Modifier.height(24.dp))
+                            SectionTitle(stringResource(R.string.detail_tips))
+                            info.tips.forEach { tip -> TipRow(tip) }
+                        }
                     } else {
                         Spacer(Modifier.height(20.dp))
                         Text(
@@ -190,7 +196,11 @@ internal fun PlantDetailScreen(
                             )
                         }
                         reminders.forEach { reminder ->
-                            ReminderRow(reminder, onClick = { onEditReminder(reminder) })
+                            ReminderRow(
+                                reminder = reminder,
+                                onClick = { onEditReminder(reminder) },
+                                onDelete = { onDeleteReminder(reminder) }
+                            )
                             Spacer(Modifier.height(8.dp))
                         }
 
@@ -224,12 +234,6 @@ internal fun PlantDetailScreen(
                     )
                 } else {
                     PrimaryButton(
-                        text = stringResource(R.string.detail_water_now),
-                        onClick = onWater,
-                        icon = DoodleIconType.Drop
-                    )
-                    Spacer(Modifier.height(10.dp))
-                    SecondaryButton(
                         text = stringResource(R.string.detail_create_reminder),
                         onClick = onCreateReminder,
                         icon = DoodleIconType.Bell
@@ -345,32 +349,33 @@ internal fun wateringStatus(days: Int): String = when {
 }
 
 @Composable
-private fun InfoGrid(info: PlantInfo) {
+private fun InfoGrid(info: PlantInfo?) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            InfoTile(DoodleIconType.Sun, stringResource(R.string.detail_light), info.light, Modifier.weight(1f))
-            InfoTile(DoodleIconType.Drop, stringResource(R.string.detail_water), info.water, Modifier.weight(1f))
+            InfoTile(DoodleIconType.Sun, stringResource(R.string.detail_light), info?.light?: "---", Modifier.weight(1f))
+            InfoTile(DoodleIconType.Drop, stringResource(R.string.detail_water), info?.water?: "---", Modifier.weight(1f))
         }
         Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             InfoTile(
                 DoodleIconType.Thermometer,
                 stringResource(R.string.detail_temperature),
-                info.temperature,
+                info?.temperature?:"---",
                 Modifier.weight(1f)
             )
             InfoTile(
                 DoodleIconType.Garden,
                 stringResource(R.string.detail_difficulty),
-                info.difficulty,
+                info?.difficulty?:"---",
                 Modifier.weight(1f)
             )
         }
+        val isPetSafe = info?.petSafe == true
         InfoTile(
-            icon = if (info.petSafe) DoodleIconType.Check else DoodleIconType.Close,
+            icon = if (isPetSafe) DoodleIconType.Check else DoodleIconType.Close,
             title = stringResource(R.string.detail_pets),
-            value = stringResource(if (info.petSafe) R.string.detail_pets_safe else R.string.detail_pets_toxic),
+            value = stringResource(if (isPetSafe) R.string.detail_pets_safe else R.string.detail_pets_toxic),
             modifier = Modifier.fillMaxWidth(),
-            iconColor = if (info.petSafe) BotanikaGreen else BotanikaError
+            iconColor = if (isPetSafe) BotanikaGreen else BotanikaError
         )
     }
 }
@@ -379,7 +384,7 @@ private fun InfoGrid(info: PlantInfo) {
 private fun InfoTile(
     icon: DoodleIconType,
     title: String,
-    value: String,
+    value: String?,
     modifier: Modifier = Modifier,
     iconColor: Color = BotanikaGreen
 ) {
@@ -405,7 +410,7 @@ private fun InfoTile(
         Column(Modifier.weight(1f)) {
             Text(text = title, color = BotanikaMuted, fontSize = 12.sp)
             Text(
-                text = value,
+                text = value ?: "",
                 color = BotanikaGreen,
                 fontSize = 14.sp,
                 lineHeight = 18.sp,
@@ -439,7 +444,11 @@ private fun TipRow(text: String) {
 }
 
 @Composable
-private fun ReminderRow(reminder: Reminder, onClick: () -> Unit) {
+private fun ReminderRow(
+    reminder: Reminder,
+    onClick: () -> Unit,
+    onDelete: () -> Unit
+) {
     val shape = RoundedCornerShape(16.dp)
     Row(
         modifier = Modifier
@@ -474,10 +483,19 @@ private fun ReminderRow(reminder: Reminder, onClick: () -> Unit) {
                 fontSize = 13.sp
             )
         }
-        DoodleIcon(
-            DoodleIconType.Bell,
-            Modifier.size(20.dp),
-            color = if (reminder.notify) BotanikaGreen else BotanikaMuted.copy(alpha = 0.5f)
-        )
+        Box(
+            modifier = Modifier
+                .size(32.dp)
+                .clip(CircleShape)
+                .background(BotanikaSage.copy(alpha = 0.6f))
+                .clickable(role = Role.Button, onClick = onDelete),
+            contentAlignment = Alignment.Center
+        ) {
+            DoodleIcon(
+                DoodleIconType.Close,
+                Modifier.size(16.dp),
+                color = BotanikaGreen
+            )
+        }
     }
 }

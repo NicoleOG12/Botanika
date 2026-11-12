@@ -67,6 +67,7 @@ import com.example.botanika.ui.theme.BotanikaGreen
 import com.example.botanika.ui.theme.BotanikaMuted
 import com.example.botanika.ui.theme.BotanikaOutline
 import com.example.botanika.ui.theme.BotanikaPink
+import com.example.botanika.ui.plants.isFuture
 import com.example.botanika.ui.theme.BotanikaSage
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -91,10 +92,13 @@ internal fun RoutineScreen(
     reminders: List<Reminder>,
     onNewReminder: () -> Unit = {},
     onEditReminder: (Reminder) -> Unit = {},
-    onToggleNotify: (Reminder) -> Unit = {},
+    onDeleteReminder: (Reminder) -> Unit = {},
     onOpenSettings: () -> Unit = {},
     onTabSelected: (MainTab) -> Unit = {}
 ) {
+    val futureReminders = remember(reminders) {
+        reminders.filter { it.isFuture() }
+    }
     val today = remember { todayUtcMillis() }
     var currentYear by rememberSaveable { mutableIntStateOf(utcYear(today)) }
     var currentMonth by rememberSaveable { mutableIntStateOf(utcMonth(today)) }
@@ -107,14 +111,14 @@ internal fun RoutineScreen(
     val shownDay = selectedDay.coerceAtMost(daysInMonth)
     val selectedUtc = utcMillisOf(currentYear, currentMonth, shownDay)
 
-    val markedDays = remember(reminders, currentYear, currentMonth, daysInMonth) {
+    val markedDays = remember(futureReminders, currentYear, currentMonth, daysInMonth) {
         (1..daysInMonth).filter { day ->
             val utc = utcMillisOf(currentYear, currentMonth, day)
-            reminders.any { it.occursOn(utc) }
+            futureReminders.any { it.occursOn(utc) }
         }.toSet()
     }
-    val tasks = remember(reminders, selectedUtc) {
-        reminders
+    val tasks = remember(futureReminders, selectedUtc) {
+        futureReminders
             .filter { it.occursOn(selectedUtc) }
             .sortedBy { it.hour * 60 + it.minute }
     }
@@ -199,7 +203,7 @@ internal fun RoutineScreen(
             tasks.forEachIndexed { i, reminder ->
                 CareTaskCard(
                     task = reminder.toCareTask(selectedUtc),
-                    onReminder = { onToggleNotify(reminder) },
+                    onDelete = { onDeleteReminder(reminder) },
                     onClick = { onEditReminder(reminder) },
                     modifier = Modifier.revealed(sections[3 + i.coerceAtMost(MAX_ANIMATED_TASKS - 1)])
                 )

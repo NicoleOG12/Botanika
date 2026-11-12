@@ -45,7 +45,7 @@ private val FertilizerTile = Color(0xFFF7E8E0)
 @Composable
 internal fun CareTaskCard(
     task: CareTask,
-    onReminder: () -> Unit,
+    onDelete: () -> Unit,
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null
 ) {
@@ -107,20 +107,20 @@ internal fun CareTaskCard(
                 overflow = TextOverflow.Ellipsis
             )
         }
-        val reminder = stringResource(R.string.care_reminder)
+        val deleteDesc = stringResource(R.string.reminder_delete)
         Box(
             modifier = Modifier
                 .size(44.dp)
                 .clip(CircleShape)
                 .background(BotanikaSage.copy(alpha = 0.6f))
-                .semantics { contentDescription = reminder }
-                .clickable(role = Role.Button, onClick = onReminder),
+                .semantics { contentDescription = deleteDesc }
+                .clickable(role = Role.Button, onClick = onDelete),
             contentAlignment = Alignment.Center
         ) {
             DoodleIcon(
-                DoodleIconType.Bell,
-                Modifier.size(24.dp),
-                color = if (task.notify) BotanikaGreen else BotanikaMuted.copy(alpha = 0.55f)
+                DoodleIconType.Close,
+                Modifier.size(20.dp),
+                color = BotanikaGreen
             )
         }
     }

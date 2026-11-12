@@ -11,10 +11,12 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.botanika.ui.camera.CameraScreen
+import com.example.botanika.ui.components.BotanikaLoader
 import com.example.botanika.ui.components.MainTab
 import com.example.botanika.ui.components.PlantImage
 import com.example.botanika.ui.components.todayUtcMillis
@@ -30,8 +32,10 @@ import com.example.botanika.ui.plants.PlantDraft
 import com.example.botanika.ui.plants.PlantFormScreen
 import com.example.botanika.ui.plants.PlantGuides
 import com.example.botanika.ui.plants.ReminderFormScreen
+import com.example.botanika.ui.plants.isFuture
 import com.example.botanika.ui.plants.nextOccurrence
 import com.example.botanika.ui.plants.toCareTask
+import com.example.botanika.ui.plants.toPlantInfo
 import com.example.botanika.ui.register.RegisterScreen
 import com.example.botanika.ui.routine.RoutineScreen
 import com.example.botanika.ui.splash.SplashScreen
@@ -55,177 +59,211 @@ internal fun BotanikaApp(vm: BotanikaViewModel = viewModel()) {
 
     val goToTab: (MainTab) -> Unit = { tab -> tabScreen(tab)?.let(vm::resetTo) }
 
-    SharedTransitionLayout {
-        AnimatedContent(
-            targetState = vm.screen,
-            transitionSpec = {
-                fadeIn(tween(SCREEN_FADE_MILLIS)) togetherWith fadeOut(tween(SCREEN_FADE_MILLIS))
-            },
-            label = "screen"
-        ) { target ->
-            when (target) {
-                Screen.Splash -> SplashScreen(
-                    flower = flower,
-                    animatedVisibilityScope = this,
-                    onFinished = { vm.resetTo(Screen.Welcome) }
-                )
+    Box(Modifier.fillMaxSize()) {
+        SharedTransitionLayout {
+            AnimatedContent(
+                targetState = vm.screen,
+                transitionSpec = {
+                    fadeIn(tween(SCREEN_FADE_MILLIS)) togetherWith fadeOut(tween(SCREEN_FADE_MILLIS))
+                },
+                label = "screen"
+            ) { target ->
+                when (target) {
+                    Screen.Splash -> SplashScreen(
+                        flower = flower,
+                        animatedVisibilityScope = this,
+                        onFinished = { vm.resetTo(Screen.Welcome) }
+                    )
 
-                Screen.Welcome -> WelcomeScreen(
-                    flower = flower,
-                    animatedVisibilityScope = this,
-                    onStart = { vm.resetTo(Screen.Login) }
-                )
+                    Screen.Welcome -> WelcomeScreen(
+                        flower = flower,
+                        animatedVisibilityScope = this,
+                        onStart = { vm.resetTo(Screen.Login) }
+                    )
 
-                Screen.Login -> LoginScreen(
-                    flower = flower,
-                    animatedVisibilityScope = this,
-                    onLogin = { _, _, _ -> vm.resetTo(Screen.Home) },
-                    onForgotPassword = {},
-                    onSignUp = { vm.resetTo(Screen.Register) }
-                )
+                    Screen.Login -> LoginScreen(
+                        flower = flower,
+                        animatedVisibilityScope = this,
+                        initialEmail = vm.rememberedEmail,
+                        initialRemember = vm.rememberMeChecked,
+                        onLogin = { email, senha, lembrar ->
+                            vm.login(email, senha, lembrar)
+                        },
+                        onForgotPassword = {},
+                        onSignUp = { vm.resetTo(Screen.Register) }
+                    )
 
-                Screen.Register -> RegisterScreen(
-                    flower = flower,
-                    animatedVisibilityScope = this,
-                    onRegister = { _, _, _ -> vm.resetTo(Screen.Home) },
-                    onLogin = { vm.resetTo(Screen.Login) }
-                )
+                    Screen.Register -> RegisterScreen(
+                        flower = flower,
+                        animatedVisibilityScope = this,
+                        onRegister = { name, email, password ->
+                            vm.register(name, email, password)
+                        },
+                        onLogin = { vm.resetTo(Screen.Login) }
+                    )
 
-                Screen.Home -> {
-                    val today = todayUtcMillis()
-                    val tasks = vm.reminders
-                        .mapNotNull { r -> r.nextOccurrence(today)?.let { day -> r to day } }
-                        .sortedWith(compareBy({ it.second }, { it.first.hour * 60 + it.first.minute }))
-                        .take(HOME_TASKS)
-                        .map { (reminder, day) -> reminder.toCareTask(day) }
-                    HomeScreen(
-                        plantCount = vm.garden.size,
-                        tasks = tasks,
-                        onOpenGarden = { vm.resetTo(Screen.Garden) },
-                        onSeeAllTasks = { vm.resetTo(Screen.Routine) },
-                        onTaskReminder = { vm.toggleNotify(it.id) },
+                    Screen.Home -> {
+                        val today = todayUtcMillis()
+                        val tasks = vm.reminders
+                            .filter { it.isFuture() }
+                            .mapNotNull { r -> r.nextOccurrence(today)?.let { day -> r to day } }
+                            .sortedWith(compareBy({ it.second }, { it.first.hour * 60 + it.first.minute }))
+                            .take(HOME_TASKS)
+                            .map { (reminder, day) -> reminder.toCareTask(day) }
+                        HomeScreen(
+                            userName = vm.userName,
+                            plantCount = vm.garden.size,
+                            tasks = tasks,
+                            onOpenGarden = { vm.resetTo(Screen.Garden) },
+                            onSeeAllTasks = { vm.resetTo(Screen.Routine) },
+                            onDeleteTask = { vm.deleteReminder(it.id) },
+                            onTabSelected = goToTab
+                        )
+                    }
+
+                    Screen.Explore -> ExploreScreen(
+                        viewModel = vm,
+                        onCameraSearch = { vm.push(Screen.Camera) },
+                        onPlantClick = { vm.openCatalogDetail(it.id) },
                         onTabSelected = goToTab
                     )
-                }
 
-                Screen.Explore -> ExploreScreen(
-                    onCameraSearch = { vm.push(Screen.Camera) },
-                    onPlantClick = { vm.openCatalogDetail(it.id) },
-                    onTabSelected = goToTab
-                )
+                    Screen.Camera -> CameraScreen(
+                        onBack = vm::back,
+                        onPhoto = { uri ->
+                            vm.back()
+                            vm.openPhotoResult(uri)
+                        }
+                    )
 
-                Screen.Camera -> CameraScreen(
-                    onBack = vm::back,
-                    onPhoto = { uri ->
-                        vm.back()
-                        vm.openPhotoResult(uri)
-                    }
-                )
-
-                Screen.Garden -> GardenScreen(
-                    plants = vm.garden,
-                    onAddPlant = { vm.push(Screen.AddPlant) },
-                    onPlantClick = { vm.openMyPlantDetail(it.id) },
-                    onTabSelected = goToTab
-                )
-
-                Screen.Routine -> RoutineScreen(
-                    reminders = vm.reminders,
-                    onNewReminder = { vm.openReminderForm() },
-                    onEditReminder = { vm.openReminderForm(reminderId = it.id) },
-                    onToggleNotify = { vm.toggleNotify(it.id) },
-                    onTabSelected = goToTab
-                )
-
-                Screen.AddPlant -> AddPlantScreen(
-                    onBack = vm::back,
-                    onPickFromCatalog = { vm.resetTo(Screen.Explore) },
-                    onUseCamera = { vm.push(Screen.Camera) },
-                    onPhotoPicked = vm::openPhotoResult,
-                    onManual = { vm.openPlantForm(PlantDraft(null, "", PlantImage.None)) }
-                )
-
-                Screen.PhotoResult -> {
-                    val photo = vm.photo
-                    if (photo != null) {
-                        PhotoResultScreen(
-                            photo = photo,
-                            onBack = vm::back,
-                            onViewInfo = { vm.openCatalogDetail(it.id) },
-                            onAddToGarden = { info ->
-                                vm.openPlantForm(
-                                    PlantDraft(info.id, context.getString(info.name), PlantImage.Photo(photo))
-                                )
-                            }
+                    Screen.Garden -> {
+                        LaunchedEffect(Unit) {
+                            vm.carregarJardim()
+                        }
+                        GardenScreen(
+                            plants = vm.garden,
+                            onAddPlant = { vm.push(Screen.AddPlant) },
+                            onPlantClick = { vm.openMyPlantDetail(it.id) },
+                            onTabSelected = goToTab
                         )
                     }
-                }
 
-                Screen.PlantDetail -> {
-                    val mine = vm.garden.firstOrNull { it.id == vm.detailPlantId }
-                    val catalog = PlantGuides.find(vm.detailCatalogId)
-                    if (mine != null) {
-                        PlantDetailScreen(
-                            name = mine.name,
-                            image = mine.image,
-                            info = PlantGuides.find(mine.catalogId),
-                            myPlant = mine,
-                            reminders = vm.reminders.filter { it.plantId == mine.id },
-                            onBack = vm::back,
-                            onAddToGarden = {},
-                            onWater = { vm.waterPlant(mine.id) },
-                            onCreateReminder = { vm.openReminderForm(plantId = mine.id) },
+                    Screen.Routine -> {
+                        LaunchedEffect(Unit) {
+                            vm.carregarLembretesLocais()
+                        }
+                        RoutineScreen(
+                            reminders = vm.reminders,
+                            onNewReminder = { vm.openReminderForm() },
                             onEditReminder = { vm.openReminderForm(reminderId = it.id) },
-                            onRemove = {
-                                vm.removePlant(mine.id)
-                                vm.back()
-                            }
+                            onDeleteReminder = { vm.deleteReminder(it.id) },
+                            onTabSelected = goToTab
                         )
-                    } else if (catalog != null) {
-                        val name = context.getString(catalog.name)
+                    }
+
+                    Screen.AddPlant -> AddPlantScreen(
+                        onBack = vm::back,
+                        onPickFromCatalog = { vm.resetTo(Screen.Explore) },
+                        onUseCamera = { vm.push(Screen.Camera) },
+                        onPhotoPicked = vm::openPhotoResult,
+                        onManual = { vm.openPlantForm(PlantDraft(null, "", PlantImage.None)) }
+                    )
+
+                    Screen.PhotoResult -> {
+                        val photo = vm.photo
+                        if (photo != null) {
+                            PhotoResultScreen(
+                                photo = photo,
+                                onBack = vm::back,
+                                onViewInfo = { vm.openCatalogDetail(it.id) },
+                                onAddToGarden = { info ->
+                                    vm.openPlantForm(
+                                        PlantDraft(info.id, info.name, PlantImage.Photo(photo))
+                                    )
+                                }
+                            )
+                        }
+                    }
+
+                    Screen.PlantDetail -> {
+                        val mine = vm.garden.firstOrNull { it.id == vm.detailPlantId }
+                        val catalog = PlantGuides.find(vm.detailCatalogId)
+                        val apiDetail = vm.selectedPlantDetail
+                        val catalogInfo = if (mine?.catalogId != null) PlantGuides.find(mine.catalogId) else catalog
+                        val plantInfo = apiDetail?.toPlantInfo() ?: catalogInfo
+
+                        val plantName = mine?.name ?: apiDetail?.nomeComum ?: catalogInfo?.name ?: "Nome desconhecido"
+                        val plantImage = mine?.image ?: apiDetail?.let {
+                            PlantImage.Url(it.imagemPadrao?.urlRegular ?: it.imagemPadrao?.miniatura ?: "")
+                        } ?: catalogInfo?.image?.let { PlantImage.Url(it) } ?: PlantImage.None
+
                         PlantDetailScreen(
-                            name = name,
-                            image = PlantImage.Res(catalog.image),
-                            info = catalog,
-                            myPlant = null,
-                            reminders = emptyList(),
+                            name = plantName,
+                            image = plantImage,
+                            info = plantInfo,
+                            myPlant = mine,
+                            reminders = if (mine != null) vm.reminders.filter { it.plantId == mine.id && it.isFuture() } else emptyList(),
                             onBack = vm::back,
                             onAddToGarden = {
-                                vm.openPlantForm(PlantDraft(catalog.id, name, PlantImage.Res(catalog.image)))
+                                if (apiDetail != null) {
+                                    vm.addPlantToGarden(apiDetail)
+                                }
                             },
-                            onWater = {},
-                            onCreateReminder = {},
-                            onEditReminder = {},
-                            onRemove = {}
+                            onWater = {
+                                if (mine != null) {
+                                    vm.waterPlant(mine.id)
+                                }
+                            },
+                            onCreateReminder = {
+                                if (mine != null) {
+                                    vm.openReminderForm(plantId = mine.id)
+                                }
+                            },
+                            onEditReminder = { reminder ->
+                                vm.openReminderForm(reminderId = reminder.id)
+                            },
+                            onDeleteReminder = { reminder ->
+                                vm.deleteReminder(reminder.id)
+                            },
+                            onRemove = {
+                                if (mine != null) {
+                                    vm.removePlant(mine.id)
+                                    vm.back()
+                                }
+                            }
                         )
                     }
+
+                    Screen.PlantForm -> PlantFormScreen(
+                        initial = vm.draft,
+                        onBack = vm::back,
+                        onSave = { plant ->
+                            vm.addPlant(plant)
+                            vm.resetTo(Screen.Garden)
+                        }
+                    )
+
+                    Screen.ReminderForm -> ReminderFormScreen(
+                        plants = vm.garden,
+                        existing = vm.reminders.firstOrNull { it.id == vm.editingReminderId },
+                        presetPlantId = vm.reminderPlantId,
+                        onBack = vm::back,
+                        onSave = { reminder ->
+                            vm.saveReminder(reminder)
+                            vm.back()
+                        },
+                        onDelete = { reminder ->
+                            vm.deleteReminder(reminder.id)
+                            vm.back()
+                        },
+                        onAddPlant = { vm.push(Screen.AddPlant) }
+                    )
                 }
-
-                Screen.PlantForm -> PlantFormScreen(
-                    initial = vm.draft,
-                    onBack = vm::back,
-                    onSave = { plant ->
-                        vm.addPlant(plant)
-                        vm.resetTo(Screen.Garden)
-                    }
-                )
-
-                Screen.ReminderForm -> ReminderFormScreen(
-                    plants = vm.garden,
-                    existing = vm.reminders.firstOrNull { it.id == vm.editingReminderId },
-                    presetPlantId = vm.reminderPlantId,
-                    onBack = vm::back,
-                    onSave = { reminder ->
-                        vm.saveReminder(reminder)
-                        vm.back()
-                    },
-                    onDelete = { reminder ->
-                        vm.deleteReminder(reminder.id)
-                        vm.back()
-                    },
-                    onAddPlant = { vm.push(Screen.AddPlant) }
-                )
             }
+        }
+
+        if (vm.isLoading) {
+            BotanikaLoader()
         }
     }
 }

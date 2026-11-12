@@ -81,13 +81,15 @@ private val CloudBumpHeight = 40.dp
 internal fun SharedTransitionScope.LoginScreen(
     flower: FlowerRender,
     animatedVisibilityScope: AnimatedVisibilityScope,
+    initialEmail: String = "",
+    initialRemember: Boolean = false,
     onLogin: (email: String, password: String, remember: Boolean) -> Unit,
     onForgotPassword: () -> Unit,
     onSignUp: () -> Unit
 ) {
-    var email by rememberSaveable { mutableStateOf("") }
+    var email by rememberSaveable { mutableStateOf(initialEmail) }
     var password by rememberSaveable { mutableStateOf("") }
-    var remember by rememberSaveable { mutableStateOf(false) }
+    var remember by rememberSaveable { mutableStateOf(initialRemember) }
     var passwordVisible by rememberSaveable { mutableStateOf(false) }
     var submitted by rememberSaveable { mutableStateOf(false) }
 

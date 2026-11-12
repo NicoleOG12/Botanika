@@ -31,6 +31,7 @@ import kotlin.math.max
 sealed interface PlantImage {
     data class Res(val id: Int) : PlantImage
     data class Photo(val uri: Uri) : PlantImage
+    data class Url(val url: String?) : PlantImage
     data object None : PlantImage
 }
 
@@ -54,6 +55,23 @@ fun PlantImageView(
             val context = LocalContext.current
             val bitmap by produceState<ImageBitmap?>(initialValue = null, image.uri) {
                 value = withContext(Dispatchers.IO) { decodePhoto(context, image.uri) }
+            }
+            val loaded = bitmap
+            if (loaded != null) {
+                Image(
+                    bitmap = loaded,
+                    contentDescription = null,
+                    contentScale = contentScale,
+                    modifier = modifier
+                )
+            } else {
+                Box(modifier.background(BotanikaSage))
+            }
+        }
+
+        is PlantImage.Url -> {
+            val bitmap by produceState<ImageBitmap?>(initialValue = null, image.url) {
+                value = withContext(Dispatchers.IO) { decodeUrl(image.url) }
             }
             val loaded = bitmap
             if (loaded != null) {
@@ -96,6 +114,13 @@ private fun decodePhoto(context: Context, uri: Uri): ImageBitmap? = runCatching 
         )
     }
     result.asImageBitmap()
+}.getOrNull()
+
+private fun decodeUrl(urlString: String?): ImageBitmap? = runCatching {
+    val url = java.net.URL(urlString)
+    url.openStream().use { inputStream ->
+        BitmapFactory.decodeStream(inputStream)?.asImageBitmap()
+    }
 }.getOrNull()
 
 private fun rotationDegrees(stream: InputStream): Float =

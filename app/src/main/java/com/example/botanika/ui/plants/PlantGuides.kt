@@ -1,128 +1,127 @@
 package com.example.botanika.ui.plants
 
-import com.example.botanika.R
+import com.example.botanika.data.remote.Planta
+import com.example.botanika.data.remote.PlantaDetalhes
+import com.example.botanika.ui.components.PlantImage
+import com.example.botanika.ui.components.todayUtcMillis
 
 data class PlantInfo(
     val id: String,
-    val name: Int,
-    val tags: Int,
-    val image: Int,
+    val name: String?,
+    val tags: Int?,
+    val image: String?,
     val scientific: String,
-    val description: String,
+    val description: String?,
     val light: String,
     val water: String,
     val temperature: String,
-    val difficulty: String,
-    val petSafe: Boolean,
-    val wateringEveryDays: Int,
-    val tips: List<String>
+    val difficulty: String?,
+    val petSafe: Boolean?,
+    val wateringEveryDays: Int?,
+    val tips: List<String>?
+)
+
+fun PlantaDetalhes.gerarDicasDeCuidado(): List<String> {
+    val dicas = mutableListOf<String>()
+
+    if (!solo.isNullOrEmpty()) {
+        dicas.add("Solo ideal: ${solo.joinToString(", ")}")
+    }
+    if (!mesesPoda.isNullOrEmpty()) {
+        dicas.add("Poda recomendada nos meses: ${mesesPoda.joinToString(", ")}")
+    }
+    if (!manutencao.isNullOrBlank()) {
+        dicas.add("Nível de manutenção: $manutencao")
+    }
+    if (toleranteSeca) {
+        dicas.add("Resistente à seca: tolera períodos com pouca água")
+    }
+    if (plantaInterior) {
+        dicas.add("Ideal para cultivo em ambientes internos")
+    }
+    if (!propagacao.isNullOrEmpty()) {
+        dicas.add("Propagação recomendada: ${propagacao.joinToString(", ")}")
+    }
+    if (benchmarkRega != null && (!benchmarkRega.valor.isNullOrBlank() || !benchmarkRega.unidade.isNullOrBlank())) {
+        val benchmarkStr = listOfNotNull(benchmarkRega.valor, benchmarkRega.unidade).filter { it.isNotBlank() }.joinToString(" ")
+        if (benchmarkStr.isNotBlank()) {
+            dicas.add("Frequência de rega: $benchmarkStr")
+        }
+    }
+    if (!suscetibilidadePragas.isNullOrEmpty()) {
+        dicas.add("Atenção a pragas: ${suscetibilidadePragas.joinToString(", ")}")
+    }
+    if (venenosaPets) {
+        dicas.add("Cuidado: tóxica para animais de estimação")
+    }
+    if (venenosaHumanos) {
+        dicas.add("Atenção: não ingerir, tóxica para humanos")
+    }
+    if (possuiEspinhos) {
+        dicas.add("Cuidado ao manusear: possui espinhos")
+    }
+    if (!taxaCrescimento.isNullOrBlank()) {
+        dicas.add("Taxa de crescimento: $taxaCrescimento")
+    }
+    if (!temporadaFloracao.isNullOrBlank()) {
+        dicas.add("Época de floração: $temporadaFloracao")
+    }
+    if (!temporadaColheita.isNullOrBlank()) {
+        dicas.add("Época de colheita: $temporadaColheita")
+    }
+
+    return dicas
+}
+
+fun PlantaDetalhes.toPlantInfo(): PlantInfo = PlantInfo(
+    id = id.toString(),
+    name = nomeComum,
+    tags = null,
+    image = imagemPadrao?.urlRegular
+        ?: imagemPadrao?.urlMedia
+        ?: imagemPadrao?.urlOriginal
+        ?: imagemPadrao?.urlPequena
+        ?: imagemPadrao?.miniatura,
+    scientific = nomeCientifico?.firstOrNull() ?: "",
+    description = descricao,
+    light = luzSolar?.firstOrNull() ?: "",
+    water = rega ?: "",
+    temperature = temporadaColheita ?: "",
+    difficulty = nivelCuidados,
+    petSafe = !venenosaPets,
+    wateringEveryDays = null,
+    tips = gerarDicasDeCuidado().takeIf { it.isNotEmpty() }
+)
+
+fun PlantaDetalhes.toPlanta(): Planta = Planta(
+    id = id,
+    nomeComum = nomeComum ?: "Nome desconhecido",
+    nomeCientifico = nomeCientifico?.firstOrNull() ?: "Científico não informado",
+    license = imagemPadrao?.licenca,
+    licenseName = imagemPadrao?.nomeLicenca,
+    licenseUrl = imagemPadrao?.urlLicenca,
+    originalUrl = imagemPadrao?.urlOriginal,
+    regularUrl = imagemPadrao?.urlRegular,
+    mediumUrl = imagemPadrao?.urlMedia,
+    smallUrl = imagemPadrao?.urlPequena,
+    thumbnail = imagemPadrao?.miniatura
+)
+
+fun Planta.toMyPlant(): MyPlant = MyPlant(
+    id = id.toString(),
+    catalogId = id.toString(),
+    name = nomeComum,
+    image = PlantImage.Url(regularUrl ?: mediumUrl ?: originalUrl ?: smallUrl ?: thumbnail ?: ""),
+    location = PlantLocation.Living,
+    wateringEveryDays = 7,
+    lastWateredUtc = todayUtcMillis(),
+    notes = ""
 )
 
 data class PlantMatch(val plant: PlantInfo, val confidence: Int)
 
 object PlantGuides {
-    val all: List<PlantInfo> = listOf(
-        PlantInfo(
-            id = "monstera",
-            name = R.string.explore_plant_monstera,
-            tags = R.string.explore_tag_easy_air,
-            image = R.drawable.plant_monstera,
-            scientific = "Monstera deliciosa",
-            description = "Planta tropical de folhas grandes e recortadas, muito usada na decoração. " +
-                "Cresce bem dentro de casa, desde que tenha boa luminosidade.",
-            light = "Luz indireta, bem iluminada",
-            water = "A cada 7 dias",
-            temperature = "18 °C a 30 °C",
-            difficulty = "Fácil",
-            petSafe = false,
-            wateringEveryDays = 7,
-            tips = listOf(
-                "Regue quando os 3 cm de cima da terra estiverem secos.",
-                "Limpe as folhas com um pano úmido para ajudar na respiração da planta.",
-                "Ofereça um tutor para ela crescer apoiada."
-            )
-        ),
-        PlantInfo(
-            id = "kentia",
-            name = R.string.explore_plant_kentia,
-            tags = R.string.explore_tag_easy_air,
-            image = R.drawable.plant_kentia,
-            scientific = "Howea forsteriana",
-            description = "Palmeira elegante e resistente, ótima para salas e escritórios. " +
-                "Cresce devagar e se adapta bem a ambientes com pouca luz.",
-            light = "Meia-sombra ou luz difusa",
-            water = "A cada 7 dias",
-            temperature = "15 °C a 28 °C",
-            difficulty = "Fácil",
-            petSafe = true,
-            wateringEveryDays = 7,
-            tips = listOf(
-                "Evite sol direto: ele queima as pontas das folhas.",
-                "Mantenha a terra levemente úmida, sem encharcar.",
-                "Gire o vaso de vez em quando para ela crescer por igual."
-            )
-        ),
-        PlantInfo(
-            id = "zamioculcas",
-            name = R.string.explore_plant_zamioculcas,
-            tags = R.string.explore_tag_resistant_shade,
-            image = R.drawable.plant_zamioculcas,
-            scientific = "Zamioculcas zamiifolia",
-            description = "Planta muito resistente, de folhas brilhantes. " +
-                "Aguenta bem o esquecimento da rega e lugares com pouca luz.",
-            light = "Pouca luz ou luz indireta",
-            water = "A cada 14 dias",
-            temperature = "18 °C a 30 °C",
-            difficulty = "Muito fácil",
-            petSafe = false,
-            wateringEveryDays = 14,
-            tips = listOf(
-                "É melhor regar de menos do que de mais: o excesso apodrece as raízes.",
-                "Use um vaso com furo para a água escorrer.",
-                "Lave as mãos depois de mexer: a seiva pode irritar a pele."
-            )
-        ),
-        PlantInfo(
-            id = "sansevieria",
-            name = R.string.explore_plant_sansevieria,
-            tags = R.string.explore_tag_resistant_water,
-            image = R.drawable.plant_sansevieria,
-            scientific = "Dracaena trifasciata",
-            description = "Também conhecida como espada-de-santa-bárbara. " +
-                "Guarda água nas folhas, por isso quase não precisa de rega.",
-            light = "Pleno sol ou meia-sombra",
-            water = "A cada 15 dias",
-            temperature = "15 °C a 35 °C",
-            difficulty = "Muito fácil",
-            petSafe = false,
-            wateringEveryDays = 15,
-            tips = listOf(
-                "No inverno, regue ainda menos: uma vez por mês costuma bastar.",
-                "Evite deixar água acumulada no centro das folhas.",
-                "Troque de vaso só quando as raízes ocuparem todo o espaço."
-            )
-        ),
-        PlantInfo(
-            id = "aloe",
-            name = R.string.explore_plant_aloe,
-            tags = R.string.explore_tag_medicinal_sun,
-            image = R.drawable.plant_aloe,
-            scientific = "Aloe vera",
-            description = "Suculenta medicinal de folhas grossas e cheias de gel. " +
-                "Gosta de bastante sol e de terra que drene bem.",
-            light = "Sol direto, várias horas por dia",
-            water = "A cada 10 dias",
-            temperature = "15 °C a 30 °C",
-            difficulty = "Fácil",
-            petSafe = false,
-            wateringEveryDays = 10,
-            tips = listOf(
-                "Espere a terra secar por completo antes de regar de novo.",
-                "Prefira vasos de barro, que ajudam a terra a secar.",
-                "Corte as folhas mais velhas, da base, para usar o gel."
-            )
-        )
-    )
+    val all: List<PlantInfo> = listOf()
 
     fun find(id: String?): PlantInfo? = all.firstOrNull { it.id == id }
 

@@ -73,11 +73,12 @@ internal fun BotanikaName(progress: () -> Float, modifier: Modifier = Modifier) 
     )
 }
 
+@OptIn(androidx.compose.animation.ExperimentalSharedTransitionApi::class)
 @Composable
 internal fun SharedTransitionScope.sharedLogoModifier(
     animatedVisibilityScope: AnimatedVisibilityScope
 ): Modifier = Modifier.sharedElement(
-    sharedContentState = rememberSharedContentState(key = LOGO_SHARED_KEY),
+    state = rememberSharedContentState(key = LOGO_SHARED_KEY),
     animatedVisibilityScope = animatedVisibilityScope,
     boundsTransform = { _, _ -> tween(LOGO_TRANSITION_MILLIS, easing = EaseInOutCubic) }
 )
