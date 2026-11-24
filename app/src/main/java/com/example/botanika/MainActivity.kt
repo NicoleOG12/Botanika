@@ -10,6 +10,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import com.example.botanika.ui.theme.BotanikaTheme
+import com.example.botanika.ui.update.UpdateDialog
 
 class MainActivity : ComponentActivity() {
 
@@ -34,6 +35,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             BotanikaTheme {
                 BotanikaApp()
+                UpdateDialog()
             }
         }
     }
