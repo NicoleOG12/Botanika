@@ -168,7 +168,9 @@ internal fun ExploreScreen(
                 PlantPhotoCard(
                     name = plant.name,
                     subtitle = plant.tags,
-                    image = if (!plant.image.isNullOrBlank()) PlantImage.Url(plant.image) else PlantImage.None,
+                    image = if (!plant.image.isNullOrBlank() || plant.tags.isNotBlank()) {
+                        PlantImage.Url(plant.image, fallbackQuery = plant.tags)
+                    } else PlantImage.None,
                     onClick = { onPlantClick(plant) },
                     modifier = Modifier.revealed(sections.getOrElse(3 + index) { Animatable(1f) })
                 )

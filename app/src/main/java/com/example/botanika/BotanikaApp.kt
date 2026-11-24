@@ -268,9 +268,15 @@ internal fun BotanikaApp(vm: BotanikaViewModel = viewModel()) {
                         val plantInfo = apiDetail?.toPlantInfo() ?: catalogInfo
 
                         val plantName = mine?.name ?: apiDetail?.nomeComum ?: catalogInfo?.name ?: "Nome desconhecido"
-                        val plantImage = mine?.image ?: apiDetail?.let {
-                            PlantImage.Url(it.imagemPadrao?.urlRegular ?: it.imagemPadrao?.miniatura ?: "")
-                        } ?: catalogInfo?.image?.let { PlantImage.Url(it) } ?: PlantImage.None
+                        val scientificFallback = apiDetail?.nomeCientifico?.firstOrNull() ?: catalogInfo?.scientific
+                        val apiImageUrl = apiDetail?.imagemPadrao?.let {
+                            it.urlRegular ?: it.urlMedia ?: it.urlOriginal ?: it.urlPequena ?: it.miniatura
+                        }
+                        val plantImage = mine?.image
+                            ?: apiImageUrl?.takeIf { it.isNotBlank() }?.let { PlantImage.Url(it, fallbackQuery = scientificFallback) }
+                            ?: scientificFallback?.takeIf { it.isNotBlank() }?.let { PlantImage.Url(null, fallbackQuery = it) }
+                            ?: catalogInfo?.image?.takeIf { it.isNotBlank() }?.let { PlantImage.Url(it) }
+                            ?: PlantImage.None
 
                         PlantDetailScreen(
                             name = plantName,

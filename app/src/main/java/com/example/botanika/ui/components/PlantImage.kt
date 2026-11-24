@@ -6,6 +6,8 @@ import android.graphics.BitmapFactory
 import android.graphics.Matrix
 import android.media.ExifInterface
 import android.net.Uri
+import android.util.Log
+import android.util.LruCache
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -27,12 +29,14 @@ import com.example.botanika.ui.theme.BotanikaSage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.InputStream
+import java.net.HttpURLConnection
+import java.net.URL
 import kotlin.math.max
 
 sealed interface PlantImage {
     data class Res(val id: Int) : PlantImage
     data class Photo(val uri: Uri) : PlantImage
-    data class Url(val url: String?) : PlantImage
+    data class Url(val url: String?, val fallbackQuery: String? = null) : PlantImage
     data object None : PlantImage
 }
 
@@ -71,8 +75,8 @@ fun PlantImageView(
         }
 
         is PlantImage.Url -> {
-            val bitmap by produceState<ImageBitmap?>(initialValue = null, image.url) {
-                value = withContext(Dispatchers.IO) { decodeUrl(image.url) }
+            val bitmap by produceState<ImageBitmap?>(initialValue = null, image.url, image.fallbackQuery) {
+                value = withContext(Dispatchers.IO) { decodeUrl(image.url, image.fallbackQuery) }
             }
             val loaded = bitmap
             if (loaded != null) {
@@ -131,15 +135,183 @@ private fun decodePhoto(context: Context, uri: Uri): ImageBitmap? = runCatching 
     result.asImageBitmap()
 }.getOrNull()
 
-private fun decodeUrl(urlString: String?): ImageBitmap? = runCatching {
-    if (urlString != null && urlString.startsWith("data:image")) {
-        val bytes = android.util.Base64.decode(urlString.substringAfter("base64,"), android.util.Base64.DEFAULT)
-        return@runCatching BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
+private val imageMemoryCache = LruCache<String, ImageBitmap>(150)
+private val PEXELS_REGEX = Regex("""pexels-photo-(\d+)""", RegexOption.IGNORE_CASE)
+private val FLICKR_REGEX = Regex("""(\d{8,14})_([a-zA-Z0-9]{8,15})(_[a-z])?\.(jpg|jpeg|png)""", RegexOption.IGNORE_CASE)
+private val SPECIES_PATH_REGEX = Regex("""species_image/\d+_([a-zA-Z0-9_]+)/""", RegexOption.IGNORE_CASE)
+
+private fun resolveCandidateUrls(originalUrl: String): List<String> {
+    val clean = originalUrl.trim()
+    val candidates = mutableListOf<String>()
+
+    // 1. Pexels CDN (perene, público, sem expiração)
+    val pexelsMatch = PEXELS_REGEX.find(clean)
+    if (pexelsMatch != null) {
+        val photoId = pexelsMatch.groupValues[1]
+        candidates.add("https://images.pexels.com/photos/$photoId/pexels-photo-$photoId.jpeg?auto=compress&cs=tinysrgb&w=640")
     }
-    val url = java.net.URL(urlString)
-    url.openStream().use { inputStream ->
-        BitmapFactory.decodeStream(inputStream)?.asImageBitmap()
+
+    // 2. Flickr CDN (perene para fotos originárias do Flickr)
+    val flickrMatch = FLICKR_REGEX.find(clean)
+    if (flickrMatch != null) {
+        val filename = flickrMatch.value
+        val id = flickrMatch.groupValues[1]
+        val secret = flickrMatch.groupValues[2]
+        candidates.add("https://live.staticflickr.com/65535/$filename")
+        candidates.add("https://live.staticflickr.com/65535/${id}_${secret}_b.jpg")
+        candidates.add("https://live.staticflickr.com/65535/${id}_${secret}_c.jpg")
     }
+
+    // 3. URL original completa
+    candidates.add(clean)
+
+    // 4. Versão sem query parameters assinados do S3 / Wasabi (?X-Amz-...)
+    if (clean.contains("?X-Amz-") || clean.contains("&X-Amz-")) {
+        val withoutQuery = clean.substringBefore("?")
+        if (!candidates.contains(withoutQuery)) {
+            candidates.add(withoutQuery)
+        }
+    }
+
+    return candidates.distinct()
+}
+
+private fun decodeUrl(urlString: String?, fallbackQuery: String? = null): ImageBitmap? {
+    val cleanUrl = urlString?.trim()?.takeIf { it.isNotBlank() }
+    val cacheKey = cleanUrl ?: "fallback_${fallbackQuery?.trim()}"
+
+    if (cleanUrl == null && fallbackQuery.isNullOrBlank()) return null
+
+    imageMemoryCache.get(cacheKey)?.let { return it }
+
+    if (cleanUrl != null && cleanUrl.startsWith("data:image")) {
+        return runCatching {
+            val bytes = android.util.Base64.decode(cleanUrl.substringAfter("base64,"), android.util.Base64.DEFAULT)
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()?.also {
+                imageMemoryCache.put(cacheKey, it)
+            }
+        }.getOrNull()
+    }
+
+    if (cleanUrl != null) {
+        val candidates = resolveCandidateUrls(cleanUrl)
+        for (candidateUrl in candidates) {
+            imageMemoryCache.get(candidateUrl)?.let {
+                imageMemoryCache.put(cacheKey, it)
+                return it
+            }
+
+            val bitmap = fetchBitmapFromNetwork(candidateUrl)
+            if (bitmap != null) {
+                imageMemoryCache.put(candidateUrl, bitmap)
+                imageMemoryCache.put(cacheKey, bitmap)
+                return bitmap
+            }
+        }
+    }
+
+    // Se a imagem direta não funcionou ou era inexistente, tenta buscar a imagem oficial da espécie via Wikipedia
+    val speciesQuery = fallbackQuery?.takeIf { it.isNotBlank() } ?: cleanUrl?.let { url ->
+        SPECIES_PATH_REGEX.find(url)?.groupValues?.get(1)?.replace('_', ' ')
+    }
+
+    if (!speciesQuery.isNullOrBlank()) {
+        val wikiImageUrl = fetchWikipediaImageUrl(speciesQuery)
+        if (!wikiImageUrl.isNullOrBlank()) {
+            val bitmap = fetchBitmapFromNetwork(wikiImageUrl)
+            if (bitmap != null) {
+                imageMemoryCache.put(cacheKey, bitmap)
+                return bitmap
+            }
+        }
+    }
+
+    return null
+}
+
+private fun fetchWikipediaImageUrl(query: String): String? = runCatching {
+    val clean = query.replace(Regex("""['"()]"""), "").trim()
+    val terms = mutableListOf<String>()
+    terms.add(clean.replace(' ', '_'))
+    val parts = clean.split(' ').filter { it.isNotBlank() }
+    if (parts.size >= 2) terms.add("${parts[0]}_${parts[1]}")
+    if (parts.isNotEmpty()) terms.add(parts[0])
+
+    for (term in terms.distinct()) {
+        val encoded = java.net.URLEncoder.encode(term, "UTF-8")
+        val url = URL("https://en.wikipedia.org/api/rest_v1/page/summary/$encoded")
+        val conn = (url.openConnection() as HttpURLConnection).apply {
+            connectTimeout = 6000
+            readTimeout = 6000
+            setRequestProperty("User-Agent", "BotanikaApp/1.0 (Mobile; Android)")
+            setRequestProperty("Accept", "application/json")
+        }
+        if (conn.responseCode in 200..299) {
+            val jsonText = conn.inputStream.bufferedReader().use { it.readText() }
+            conn.disconnect()
+            val json = com.google.gson.JsonParser.parseString(jsonText).asJsonObject
+            val thumb = json.getAsJsonObject("thumbnail")?.get("source")?.asString
+                ?: json.getAsJsonObject("originalimage")?.get("source")?.asString
+            if (!thumb.isNullOrBlank()) return@runCatching thumb
+        } else {
+            conn.disconnect()
+        }
+    }
+    null
+}.getOrNull()
+
+private fun fetchBitmapFromNetwork(initialUrl: String): ImageBitmap? = runCatching {
+    var currentUrl = initialUrl
+    var redirects = 0
+    var resultBitmap: ImageBitmap? = null
+
+    while (redirects < 5) {
+        val url = URL(currentUrl)
+        val connection = (url.openConnection() as HttpURLConnection).apply {
+            connectTimeout = 15000
+            readTimeout = 20000
+            instanceFollowRedirects = true
+            setRequestProperty(
+                "User-Agent",
+                "Mozilla/5.0 (Linux; Android 10; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+            )
+            setRequestProperty(
+                "Accept",
+                "image/webp,image/apng,image/png,image/jpeg,image/*,*/*;q=0.8"
+            )
+        }
+
+        val statusCode = connection.responseCode
+        if (statusCode in 300..399) {
+            val newLocation = connection.getHeaderField("Location")
+            connection.disconnect()
+            if (!newLocation.isNullOrBlank()) {
+                currentUrl = if (newLocation.startsWith("http://") || newLocation.startsWith("https://")) {
+                    newLocation
+                } else {
+                    URL(url, newLocation).toString()
+                }
+                redirects++
+                continue
+            }
+        }
+
+        if (statusCode in 200..299) {
+            connection.inputStream.use { inputStream ->
+                val decoded = BitmapFactory.decodeStream(inputStream)
+                if (decoded != null) {
+                    resultBitmap = decoded.asImageBitmap()
+                }
+            }
+        } else {
+            Log.w("PlantImage", "HTTP $statusCode ao carregar imagem: $currentUrl")
+        }
+        connection.disconnect()
+        break
+    }
+    resultBitmap
+}.onFailure { e ->
+    Log.e("PlantImage", "Erro ao carregar imagem '$initialUrl': ${e.message}", e)
 }.getOrNull()
 
 private fun rotationDegrees(stream: InputStream): Float =

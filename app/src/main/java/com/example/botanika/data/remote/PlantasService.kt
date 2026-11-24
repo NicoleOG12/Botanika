@@ -119,22 +119,24 @@ class PlantasService {
                     ?: (detailsMap?.get("default_image") as? Map<*, *>)
                     ?: (detailsMap?.get("imagemPadrao") as? Map<*, *>)
 
-                val license = (defaultImage?.get("license") as? Number)?.toInt()
-                val licenseName = defaultImage?.get("license_name") as? String
-                val licenseUrl = defaultImage?.get("license_url") as? String
-                val originalUrl = defaultImage?.get("original_url") as? String
-                val regularUrl = defaultImage?.get("regular_url") as? String
-                    ?: data["regularUrl"] as? String
-                    ?: (detailsMap?.get("regular_url") as? String)
-                val mediumUrl = defaultImage?.get("medium_url") as? String
-                    ?: data["mediumUrl"] as? String
-                    ?: (detailsMap?.get("medium_url") as? String)
-                val smallUrl = defaultImage?.get("small_url") as? String
-                    ?: data["smallUrl"] as? String
-                    ?: (detailsMap?.get("small_url") as? String)
-                val thumbnail = defaultImage?.get("thumbnail") as? String
-                    ?: data["thumbnail"] as? String
-                    ?: (detailsMap?.get("thumbnail") as? String)
+                val license = ((defaultImage?.get("license") ?: defaultImage?.get("licenca")) as? Number)?.toInt()
+                val licenseName = (defaultImage?.get("license_name") ?: defaultImage?.get("nomeLicenca") ?: defaultImage?.get("licenseName")) as? String
+                val licenseUrl = (defaultImage?.get("license_url") ?: defaultImage?.get("urlLicenca") ?: defaultImage?.get("licenseUrl")) as? String
+                val originalUrl = (defaultImage?.get("original_url") ?: defaultImage?.get("urlOriginal") ?: defaultImage?.get("originalUrl")
+                    ?: data["original_url"] ?: data["originalUrl"] ?: detailsMap?.get("original_url") ?: detailsMap?.get("originalUrl")) as? String
+                val regularUrl = (defaultImage?.get("regular_url") ?: defaultImage?.get("urlRegular") ?: defaultImage?.get("regularUrl")
+                    ?: data["regular_url"] ?: data["regularUrl"] ?: detailsMap?.get("regular_url") ?: detailsMap?.get("regularUrl")) as? String
+                val mediumUrl = (defaultImage?.get("medium_url") ?: defaultImage?.get("urlMedia") ?: defaultImage?.get("mediumUrl")
+                    ?: data["medium_url"] ?: data["mediumUrl"] ?: detailsMap?.get("medium_url") ?: detailsMap?.get("mediumUrl")) as? String
+                val smallUrl = (defaultImage?.get("small_url") ?: defaultImage?.get("urlPequena") ?: defaultImage?.get("smallUrl")
+                    ?: data["small_url"] ?: data["smallUrl"] ?: detailsMap?.get("small_url") ?: detailsMap?.get("smallUrl")) as? String
+                val thumbnail = (defaultImage?.get("thumbnail") ?: defaultImage?.get("miniatura")
+                    ?: data["thumbnail"] ?: data["miniatura"] ?: detailsMap?.get("thumbnail") ?: detailsMap?.get("miniatura")) as? String
+
+                val directUrl = (data["image"] ?: data["imageUrl"] ?: data["image_url"] ?: data["foto"] ?: data["url"]
+                    ?: (data["default_image"] as? String) ?: (detailsMap?.get("default_image") as? String)) as? String
+
+                val finalRegular = regularUrl ?: mediumUrl ?: originalUrl ?: smallUrl ?: thumbnail ?: directUrl
 
                 lista.add(
                     Planta(
@@ -144,11 +146,11 @@ class PlantasService {
                         license = license,
                         licenseName = licenseName,
                         licenseUrl = licenseUrl,
-                        originalUrl = originalUrl,
-                        regularUrl = regularUrl,
-                        mediumUrl = mediumUrl,
-                        smallUrl = smallUrl,
-                        thumbnail = thumbnail,
+                        originalUrl = originalUrl ?: finalRegular,
+                        regularUrl = finalRegular,
+                        mediumUrl = mediumUrl ?: finalRegular,
+                        smallUrl = smallUrl ?: finalRegular,
+                        thumbnail = thumbnail ?: finalRegular,
                         isIndoor = isIndoor,
                         isSun = isSun
                     )
@@ -308,19 +310,45 @@ class PlantasService {
                 }
             }
 
-            val finalImagem = detalhes.imagemPadrao ?: run {
-                val defaultImage = data["default_image"] as? Map<*, *>
-                    ?: data["imagemPadrao"] as? Map<*, *>
+            val defaultImage = (data["default_image"] as? Map<*, *>)
+                ?: (data["imagemPadrao"] as? Map<*, *>)
+                ?: ((detailsObj as? Map<*, *>)?.get("default_image") as? Map<*, *>)
+                ?: ((detailsObj as? Map<*, *>)?.get("imagemPadrao") as? Map<*, *>)
+
+            val directUrl = (data["image"] ?: data["imageUrl"] ?: data["image_url"] ?: data["foto"] ?: data["url"]
+                ?: (data["default_image"] as? String)
+                ?: ((detailsObj as? Map<*, *>)?.get("default_image") as? String)) as? String
+
+            val finalImagem = detalhes.imagemPadrao?.let { img ->
+                if (img.urlRegular.isNullOrBlank() && img.urlMedia.isNullOrBlank() && img.urlOriginal.isNullOrBlank() && img.urlPequena.isNullOrBlank() && img.miniatura.isNullOrBlank()) {
+                    null
+                } else img
+            } ?: run {
                 if (defaultImage != null) {
+                    val reg = (defaultImage["regular_url"] ?: defaultImage["urlRegular"] ?: defaultImage["regularUrl"]) as? String
+                    val med = (defaultImage["medium_url"] ?: defaultImage["urlMedia"] ?: defaultImage["mediumUrl"]) as? String
+                    val orig = (defaultImage["original_url"] ?: defaultImage["urlOriginal"] ?: defaultImage["originalUrl"]) as? String
+                    val small = (defaultImage["small_url"] ?: defaultImage["urlPequena"] ?: defaultImage["smallUrl"]) as? String
+                    val thumb = (defaultImage["thumbnail"] ?: defaultImage["miniatura"]) as? String
+                    val fallback = reg ?: med ?: orig ?: small ?: thumb ?: directUrl
+
                     DefaultImageDto(
-                        licenca = (defaultImage["license"] as? Number)?.toInt(),
-                        nomeLicenca = defaultImage["license_name"] as? String,
-                        urlLicenca = defaultImage["license_url"] as? String,
-                        urlOriginal = defaultImage["original_url"] as? String,
-                        urlRegular = defaultImage["regular_url"] as? String,
-                        urlMedia = defaultImage["medium_url"] as? String,
-                        urlPequena = defaultImage["small_url"] as? String,
-                        miniatura = defaultImage["thumbnail"] as? String
+                        licenca = ((defaultImage["license"] ?: defaultImage["licenca"]) as? Number)?.toInt(),
+                        nomeLicenca = (defaultImage["license_name"] ?: defaultImage["nomeLicenca"] ?: defaultImage["licenseName"]) as? String,
+                        urlLicenca = (defaultImage["license_url"] ?: defaultImage["urlLicenca"] ?: defaultImage["licenseUrl"]) as? String,
+                        urlOriginal = orig ?: fallback,
+                        urlRegular = reg ?: fallback,
+                        urlMedia = med ?: fallback,
+                        urlPequena = small ?: fallback,
+                        miniatura = thumb ?: fallback
+                    )
+                } else if (!directUrl.isNullOrBlank()) {
+                    DefaultImageDto(
+                        urlOriginal = directUrl,
+                        urlRegular = directUrl,
+                        urlMedia = directUrl,
+                        urlPequena = directUrl,
+                        miniatura = directUrl
                     )
                 } else null
             }

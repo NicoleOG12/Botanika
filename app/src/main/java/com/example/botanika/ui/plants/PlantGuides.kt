@@ -111,7 +111,10 @@ fun Planta.toMyPlant(): MyPlant = MyPlant(
     id = id.toString(),
     catalogId = id.toString(),
     name = nomeComum,
-    image = PlantImage.Url(regularUrl ?: mediumUrl ?: originalUrl ?: smallUrl ?: thumbnail ?: ""),
+    image = PlantImage.Url(
+        url = regularUrl ?: mediumUrl ?: originalUrl ?: smallUrl ?: thumbnail ?: "",
+        fallbackQuery = nomeCientifico
+    ),
     location = PlantLocation.entries.firstOrNull { it.name == localizacao } ?: PlantLocation.Living,
     wateringEveryDays = diasRega ?: 7,
     lastWateredUtc = ultimaRegaUtc ?: todayUtcMillis(),
