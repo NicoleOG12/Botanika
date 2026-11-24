@@ -21,31 +21,35 @@ import com.example.botanika.ui.theme.BotanikaGreen
 import com.example.botanika.ui.theme.BotanikaMuted
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
 
 private const val SITE_URL = "https://botanika-landing.vercel.app"
-private const val VERSION_URL = "$SITE_URL/version.json"
+private const val VERSION_SOURCE_URL =
+    "https://raw.githubusercontent.com/NicoleOG12/Botanika/main/app/build.gradle.kts"
 private const val DOWNLOAD_URL = "$SITE_URL/#download"
 
-data class UpdateInfo(val versionCode: Int, val versionName: String, val notes: String?)
+private val VERSION_CODE_REGEX = Regex("""versionCode\s*=\s*(\d+)""")
+private val VERSION_NAME_REGEX = Regex("""versionName\s*=\s*"([^"]*)"""")
 
-/** Lê o version.json publicado no site. Retorna null se estiver offline ou o arquivo for inválido. */
+data class UpdateInfo(val versionCode: Int, val versionName: String)
+
+/** Lê o versionCode do build.gradle.kts na branch main do GitHub. Retorna null se estiver offline ou sem match. */
 private suspend fun fetchLatestVersion(): UpdateInfo? = withContext(Dispatchers.IO) {
     runCatching {
-        val conn = (URL(VERSION_URL).openConnection() as HttpURLConnection).apply {
+        val conn = (URL(VERSION_SOURCE_URL).openConnection() as HttpURLConnection).apply {
             connectTimeout = 5_000
             readTimeout = 5_000
             useCaches = false
         }
         try {
             if (conn.responseCode != HttpURLConnection.HTTP_OK) return@runCatching null
-            val json = JSONObject(conn.inputStream.bufferedReader().use { it.readText() })
+            val gradle = conn.inputStream.bufferedReader().use { it.readText() }
+            val code = VERSION_CODE_REGEX.find(gradle)?.groupValues?.get(1)?.toIntOrNull()
+                ?: return@runCatching null
             UpdateInfo(
-                versionCode = json.getInt("versionCode"),
-                versionName = json.optString("versionName", ""),
-                notes = json.optString("notes", "").takeIf { it.isNotBlank() }
+                versionCode = code,
+                versionName = VERSION_NAME_REGEX.find(gradle)?.groupValues?.get(1).orEmpty()
             )
         } finally {
             conn.disconnect()
@@ -79,7 +83,6 @@ fun UpdateDialog() {
             Column {
                 val version = update.versionName.takeIf { it.isNotBlank() }?.let { " (versão $it)" }.orEmpty()
                 Text("Uma nova versão do Botanika$version está disponível. Baixe o novo APK para continuar aproveitando as novidades.", color = BotanikaMuted)
-                update.notes?.let { Text("\n$it", color = BotanikaMuted) }
             }
         },
         confirmButton = {
