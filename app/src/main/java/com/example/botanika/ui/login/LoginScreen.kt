@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -78,7 +80,11 @@ private val LoginFlowerWidth = 150.dp
 private val HeaderMinHeight = 300.dp
 private const val HEADER_FRACTION = 0.38f
 private val CloudBumpHeight = 40.dp
+private const val SHEET_PADDING_FRACTION = 0.09f
+private val SheetPaddingMin = 24.dp
+private val SheetPaddingMax = 40.dp
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun SharedTransitionScope.LoginScreen(
     flower: FlowerRender,
@@ -142,6 +148,7 @@ internal fun SharedTransitionScope.LoginScreen(
     ) {
         val headerHeight = (maxHeight * HEADER_FRACTION).coerceAtLeast(HeaderMinHeight)
         val sheetMinHeight = (maxHeight - headerHeight).coerceAtLeast(0.dp)
+        val sheetHorizontalPadding = (maxWidth * SHEET_PADDING_FRACTION).coerceIn(SheetPaddingMin, SheetPaddingMax)
 
         Column(
             modifier = Modifier
@@ -172,7 +179,7 @@ internal fun SharedTransitionScope.LoginScreen(
                     .heightIn(min = sheetMinHeight)
                     .background(Color.White, CloudTopShape(CloudBumpHeight))
                     .navigationBarsPadding()
-                    .padding(start = 40.dp, end = 40.dp, top = CloudBumpHeight + 36.dp, bottom = 32.dp),
+                    .padding(start = sheetHorizontalPadding, end = sheetHorizontalPadding, top = CloudBumpHeight + 36.dp, bottom = 32.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 AuthTextField(
@@ -221,13 +228,13 @@ internal fun SharedTransitionScope.LoginScreen(
 
                 Spacer(Modifier.height(10.dp))
 
-                Row(
+                FlowRow(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 6.dp)
                         .revealed(options),
                     horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalArrangement = Arrangement.Center
                 ) {
                     RememberMe(checked = remember, onCheckedChange = { remember = it })
                     Text(

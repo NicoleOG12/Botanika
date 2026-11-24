@@ -168,6 +168,7 @@ internal fun SharedTransitionScope.RegisterScreen(
     ) {
         val headerHeight = (maxHeight * HEADER_FRACTION).coerceAtLeast(HeaderMinHeight)
         val sheetMinHeight = (maxHeight - headerHeight).coerceAtLeast(0.dp)
+        val sheetHorizontalPadding = (maxWidth * 0.09f).coerceIn(24.dp, 40.dp)
 
         Column(
             modifier = Modifier
@@ -198,7 +199,7 @@ internal fun SharedTransitionScope.RegisterScreen(
                     .heightIn(min = sheetMinHeight)
                     .background(Color.White, CloudTopShape(CloudBumpHeight))
                     .navigationBarsPadding()
-                    .padding(start = 40.dp, end = 40.dp, top = CloudBumpHeight + 28.dp, bottom = 32.dp),
+                    .padding(start = sheetHorizontalPadding, end = sheetHorizontalPadding, top = CloudBumpHeight + 28.dp, bottom = 32.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 AuthTextField(
